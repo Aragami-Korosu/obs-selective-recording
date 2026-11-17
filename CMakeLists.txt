@@ -37,8 +37,52 @@ if(ENABLE_QT)
   )
 endif()
 
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(
+  ${CMAKE_PROJECT_NAME}
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src" "${CMAKE_CURRENT_SOURCE_DIR}/third-party/obs-websocket"
+)
 
-target_sources(${CMAKE_PROJECT_NAME} PRIVATE src/plugin/plugin-main.cpp src/plugin/plugin-main.hpp)
+target_sources(
+  ${CMAKE_PROJECT_NAME}
+  PRIVATE
+    src/api/websocket-api.cpp
+    src/api/websocket-api.hpp
+    src/audio/audio-mixer.cpp
+    src/audio/audio-mixer.hpp
+    src/core/controller.cpp
+    src/core/controller.hpp
+    src/core/live-state.cpp
+    src/core/live-state.hpp
+    src/core/obs-utils.cpp
+    src/core/obs-utils.hpp
+    src/core/pipeline.cpp
+    src/core/pipeline.hpp
+    src/core/route-store.cpp
+    src/core/route-store.hpp
+    src/core/routes.cpp
+    src/core/routes.hpp
+    src/core/settings.cpp
+    src/core/settings.hpp
+    src/plugin/plugin-main.cpp
+    src/plugin/plugin-main.hpp
+    src/recording/encoders.cpp
+    src/recording/encoders.hpp
+    src/recording/recorder.cpp
+    src/recording/recorder.hpp
+    src/recording/recovery.cpp
+    src/recording/recovery.hpp
+    src/ui/canvas-tab.cpp
+    src/ui/canvas-tab.hpp
+    src/ui/dock.cpp
+    src/ui/dock.hpp
+    src/ui/preview-widget.cpp
+    src/ui/preview-widget.hpp
+    src/ui/route-button.cpp
+    src/ui/route-button.hpp
+    src/ui/settings-dialog.cpp
+    src/ui/settings-dialog.hpp
+    src/video/scene-mirror.cpp
+    src/video/scene-mirror.hpp
+)
 
 set_target_properties_plugin(${CMAKE_PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
