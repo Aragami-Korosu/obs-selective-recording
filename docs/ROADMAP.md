@@ -37,9 +37,9 @@ These three questions decide whether the architecture is sound. They come before
 - [x] Configure CMake presets with Qt6 and the frontend API enabled
 - [x] Register plugin metadata and locale
 - [x] Add basic logging
-- [ ] Build Debug and RelWithDebInfo on Windows
+- [x] Confirm CI passes on all platforms
+- [ ] Build Debug and RelWithDebInfo locally on Windows
 - [ ] Confirm the plugin loads and unloads cleanly in OBS
-- [ ] Confirm CI passes on all platforms
 
 **Done when:** the project compiles, OBS loads and unloads the plugin without crashing, and log lines appear in the OBS log.
 
