@@ -47,8 +47,7 @@ These three questions decide whether the architecture is sound. They come before
 - [x] Configure CMake presets with Qt6 and the frontend API enabled
 - [x] Register plugin metadata and locale
 - [x] Add basic logging
-- [x] CI builds on Windows and macOS
-- [ ] CI builds on Ubuntu (blocked by OBS's package server returning 503; re-run pending)
+- [x] CI builds on Windows, macOS and Ubuntu
 - [ ] Build Debug and RelWithDebInfo locally on Windows
 - [ ] **Load test in OBS 32.2.2**: the plugin loads, unloads, and logs both the main canvas and the `Aitum Vertical` canvas
 
