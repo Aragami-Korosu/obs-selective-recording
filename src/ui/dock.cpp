@@ -109,11 +109,11 @@ Dock::Dock(Controller &controller, QWidget *parent) : QWidget(parent), controlle
 	});
 
 	connect(show_files, &QPushButton::clicked, this, [this]() {
-		for (const auto &rec : controller_.interrupted()) {
-			QDesktopServices::openUrl(
-				QUrl::fromLocalFile(QFileInfo(QString::fromStdString(rec.path)).absolutePath()));
-			break;
-		}
+		const auto &items = controller_.interrupted();
+		if (items.empty())
+			return;
+		const QString path = QString::fromStdString(items.front().path);
+		QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(path).absolutePath()));
 	});
 	connect(dismiss, &QPushButton::clicked, this, [this]() {
 		const auto items = controller_.interrupted();
