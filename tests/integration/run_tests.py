@@ -423,6 +423,8 @@ def test_collection_switch(h):
         check("recording file valid after the switch", duration > 5, f"{duration:.1f}s")
     route = h.obs.vendor("GetRoute", {"source_name": "SR Box Green"})
     check("routes restored with the collection", route.get("video") == "stream_only", route)
+    vertical = wait_for(lambda: h.status(VERTICAL), 10)
+    check("recreated Vertical canvas picked up again", vertical is not None)
 
 
 def test_hotkey(h):

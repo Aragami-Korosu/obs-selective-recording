@@ -18,6 +18,7 @@ namespace {
 constexpr const char *kSaveKey = "selective-recording";
 constexpr int kTickMs = 250;
 constexpr int kWarningTicks = 4;
+constexpr int kCanvasTicks = 8;
 Controller *g_instance = nullptr;
 
 struct HotkeyTarget {
@@ -180,7 +181,10 @@ void Controller::on_frontend_event(obs_frontend_event event)
 	case OBS_FRONTEND_EVENT_CANVAS_REMOVED:
 		refresh_canvases();
 		break;
+	case OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN:
 	case OBS_FRONTEND_EVENT_EXIT:
+		// OBS clears every scene and source right after SCRIPTING_SHUTDOWN and waits for them
+		// to be released, so recordings and mirrors must let go here, not at EXIT.
 		shutdown();
 		break;
 	default:
@@ -330,8 +334,14 @@ void Controller::on_tick()
 	if (any_active)
 		emit statsUpdated();
 
-	if (++ticks_ % kWarningTicks == 0)
+	++ticks_;
+	if (ticks_ % kWarningTicks == 0)
 		evaluate_warnings_now();
+
+	// Plugins can recreate their canvas without a frontend event (Aitum Vertical does on a
+	// scene collection switch), and a new canvas may get its video a moment later.
+	if (ticks_ % kCanvasTicks == 0)
+		refresh_canvases();
 }
 
 void Controller::evaluate_warnings_now()
@@ -414,7 +424,10 @@ void Controller::shutdown()
 	save_hotkeys();
 	settings_.save();
 
-	// Finish every recording before OBS tears down, so files are finalised.
+	// Finish every recording before OBS tears down, so files are finalised. Stop them all
+	// first so they finalise in parallel.
+	for (auto &[key, p] : pipelines_)
+		p->stop();
 	for (auto &[key, p] : pipelines_)
 		p->stop_and_wait(8000);
 	pipelines_.clear();
