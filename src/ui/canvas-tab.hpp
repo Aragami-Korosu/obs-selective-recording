@@ -40,6 +40,9 @@ public:
 	void refresh_warnings();
 	void rebuild_if_changed(bool force = false);
 
+	// Drops every source reference now, before the tab itself is deleted later.
+	void release();
+
 private:
 	struct Row {
 		OBSSource source;

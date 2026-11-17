@@ -214,6 +214,14 @@ std::string CanvasTab::structure_signature() const
 	return sig;
 }
 
+void CanvasTab::release()
+{
+	preview_->set_canvas(nullptr);
+	tree_->clear();
+	rows_.clear();
+	signature_.clear();
+}
+
 void CanvasTab::rebuild_if_changed(bool force)
 {
 	std::string sig = structure_signature();
