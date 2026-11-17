@@ -17,13 +17,13 @@ Video and audio are set separately. The plugin **never changes your stream**. It
 
 Each source in OBS's **Sources** list has a round button next to its eye icon:
 
-| Button | Route |
-| :---: | --- |
-| Half blue, half red | **Both** |
-| Blue | **Stream** (left out of the recording) |
-| Red | **Recording** (recording only) |
-| Grey ring | **Off** |
-| White centre | Video and audio are set differently (change them in the dock's Advanced view) |
+| Symbol | Route |
+| --- | --- |
+| Blue radio waves around a red dot | **Both** |
+| Blue radio waves (broadcast) | **Stream** (left out of the recording) |
+| Red record button | **Recording** (recording only) |
+| Grey slashed circle | **Off** |
+| Small amber corner dot | Video and audio are set differently (change them in the dock's Advanced view) |
 
 - **Click** to cycle Both → Stream → Recording. One click sets the source's video and audio together, on every canvas.
 - **Right-click** for Off, to open the dock, or to hide these buttons. You can also turn them off in Settings → Interface.

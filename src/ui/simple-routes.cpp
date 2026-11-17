@@ -37,7 +37,7 @@ void draw_dot(QPainter &p, const QPointF &c, double radius, const QColor &color)
 // Broadcast symbol: two pairs of radio-wave arcs either side of the centre.
 void draw_waves(QPainter &p, const QPointF &c, double half, const QColor &color)
 {
-	QPen pen(color, std::max(1.2, half * 0.17));
+	QPen pen(color, std::max(1.5, half * 0.2));
 	pen.setCapStyle(Qt::RoundCap);
 	p.setPen(pen);
 	p.setBrush(Qt::NoBrush);

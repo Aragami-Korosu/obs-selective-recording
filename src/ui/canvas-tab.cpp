@@ -402,7 +402,7 @@ void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source,
 
 	row.combined = new QToolButton(tree_);
 	row.combined->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-	row.combined->setIconSize(QSize(14, 14));
+	row.combined->setIconSize(QSize(16, 16));
 	row.combined->setMinimumWidth(104);
 	row.combined->setCursor(Qt::PointingHandCursor);
 	row.combined->setContextMenuPolicy(Qt::CustomContextMenu);

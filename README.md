@@ -57,14 +57,15 @@ To uninstall, close OBS and delete `C:\ProgramData\obs-studio\plugins\obs-select
 
 Like Streamlabs, every source in OBS's **Sources** list gets a small button next to its eye icon:
 
-| Button | Meaning |
-| :---: | --- |
-| 🔵🔴 half and half | **Both**: stream and recording |
-| 🔵 blue | **Stream**: left out of the recording |
-| 🔴 red | **Recording**: in the recording only (hide it in OBS to keep it off the stream) |
+| Symbol | Meaning |
+| --- | --- |
+| Blue radio waves around a red dot | **Both**: stream and recording |
+| Blue radio waves (broadcast) | **Stream**: left out of the recording |
+| Red record button | **Recording**: in the recording only (hide it in OBS to keep it off the stream) |
+| Grey slashed circle | **Off** |
 
-1. Click the button next to your alerts or chat overlay until it turns **blue**. It's now left out of the recording.
-2. To record a source that isn't on stream, click until it's **red**, then hide it with the eye icon.
+1. Click the button next to your alerts or chat overlay until it shows the **broadcast** symbol. It's now left out of the recording.
+2. To record a source that isn't on stream, click until it shows the **record** symbol, then hide it with the eye icon.
 3. In the **Selective Recording** dock, click **Start recording**, or **Start all recordings** to record every canvas.
 
 Right-click a button for **Off** and more. The dock shows the same buttons for the current scene, plus a tab for Aitum Vertical. Its **Advanced** view has separate video and audio controls and per-canvas options.

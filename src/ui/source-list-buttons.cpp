@@ -182,8 +182,8 @@ void SourceListButtons::sync()
 			button->setObjectName(QString::fromLatin1(kButtonName));
 			button->setAutoRaise(true);
 			button->setFocusPolicy(Qt::NoFocus);
-			button->setIconSize(QSize(14, 14));
-			button->setFixedSize(22, 20);
+			button->setIconSize(QSize(16, 16));
+			button->setFixedSize(24, 22);
 			button->setCursor(Qt::PointingHandCursor);
 			button->setContextMenuPolicy(Qt::CustomContextMenu);
 			button->setStyleSheet(QStringLiteral("QToolButton { border: none; background: transparent; }"));
