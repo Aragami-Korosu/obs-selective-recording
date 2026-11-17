@@ -4,11 +4,13 @@ Each record captures one significant design decision: the context, what was deci
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [0001](0001-obs-view-over-canvas-api.md) | Use `obs_view` instead of the Canvas API | Accepted, partly superseded by 0005 |
+| [0001](0001-obs-view-over-canvas-api.md) | Use `obs_view` instead of the Canvas API | Superseded by 0006 |
 | [0002](0002-private-scene-mirror.md) | Mirror scenes privately while sharing sources | Accepted |
 | [0003](0003-stream-exclusion.md) | Preserve the live composition; stream exclusion is user-managed | Accepted |
-| [0004](0004-independent-audio-mix.md) | Build an independent audio mix instead of using OBS tracks | Accepted, pending POC 2 |
+| [0004](0004-independent-audio-mix.md) | Build an independent audio mix instead of using OBS tracks | Accepted |
 | [0005](0005-multi-canvas-support.md) | Support multiple canvases, including Aitum Vertical Canvas | Accepted |
+| [0006](0006-private-canvas-rendering.md) | Render through a private canvas | Accepted |
+| [0007](0007-routes-in-scene-collection.md) | Store routes in the scene collection | Accepted |
 
 ## Template
 

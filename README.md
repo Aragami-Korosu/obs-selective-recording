@@ -1,70 +1,81 @@
 # OBS Selective Recording
 
-Choose which sources go to your **stream**, which go to your **recording**, and which go to both. This applies to video and audio separately, and the scene you stream stays exactly as you built it.
-
-> [!WARNING]
-> **Early development.** The plugin loads in OBS but doesn't route anything yet. Progress is tracked in the [roadmap](docs/ROADMAP.md).
+Record a different mix of sources than you stream. You decide, for every source and separately for video and audio, what goes into the recording. Your stream stays exactly as you built it. It works on every canvas, including [Aitum Vertical](https://github.com/Aitum/obs-vertical-canvas), so horizontal and vertical can each have their own selective recording.
 
 ## What it does
 
-Most streamers want their recording to differ slightly from their live output. You might drop alerts and chat overlays from a YouTube upload, or keep copyrighted music off the VOD while your stream still hears it. OBS Selective Recording adds a dock where you choose what goes into the recording for each source:
+Most streamers want their recording to be a little different from what goes live. You might drop alerts and chat overlays from the YouTube upload, keep copyrighted music off the VOD, or record a camera you don't show on stream. Selective Recording adds a dock where you choose what goes into the recording for each source:
 
 | Route | In the recording | Your stream |
 | --- | :---: | --- |
 | **Both** | ✅ | Unchanged |
 | **Stream only** | — | Unchanged |
-| **Recording only** | ✅ | Hide it in OBS. The plugin warns you if it's still live. |
+| **Rec only** | ✅ | Hide it in OBS. The plugin warns you if it's still live. |
 | **Off** | — | Hide it in OBS. The plugin warns you if it's still live. |
 
-You set video and audio routes separately. For example, your game capture can appear in the recording while its audio is left out.
-
-> **Your stream is never touched.** The plugin only controls its own recordings. It never hides, mutes or changes anything in your live scenes, your stream, or other plugins' outputs. That way, a recording problem can't change what your viewers see.
+> **Your stream is never touched.** The plugin only controls its own recordings. It never hides, mutes or changes anything in your live scenes, your streams or other plugins' outputs, so a recording problem can't change what your viewers see.
 
 ### Works with dual output
 
-Streamlabs turns off Selective Recording when Dual Output is enabled. This plugin is designed for that setup. With [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas), you get a separate selective recording for the **horizontal** and the **vertical** canvas. You can run either one, or both at once, while both streams stay live. If one recording fails, the other keeps going.
+Streamlabs turns off Selective Recording when Dual Output is on. This plugin is built for that setup: with Aitum Vertical Canvas you get a selective recording for the **horizontal** canvas and one for the **vertical** canvas. You can run either or both while both streams are live. If one recording fails, the other keeps going.
 
-## Planned features
+## Features
 
-- A dockable panel listing every source, with separate video and audio routing.
-- A private recording composition that follows your scenes, transforms, filters and transitions automatically.
-- An independent recording audio mix built per source, separate from your OBS track setup.
-- Dual-output support: a separate selective recording for each canvas (horizontal and vertical), with routing rules shared between them and per-canvas exceptions.
-- Independent recording settings: encoder, resolution, frame rate, bitrate and container.
-- A live preview of the recording composition.
-- Routing profiles, hotkeys and settings that persist across restarts.
-- Recovery: interrupted recordings stay playable and are flagged the next time OBS starts.
-- No external services, accounts or Streamlabs dependency.
-
-See the [specification](docs/SPECIFICATION.md) for the full requirements.
+- A dock with a tab for each canvas, listing every scene and source, with separate video and audio routing
+- Routes for every canvas, for one canvas only, or for one placement of a source
+- Warnings when a source you meant to keep off the stream is still live, including audio still on the stream's track
+- A recording composition that follows your scenes, nested scenes, groups, transforms, transitions and Studio Mode automatically
+- Independent recording audio built per source, with OBS's fader, mute and sync offset, plus per-source recording volume
+- Independent recording settings for each canvas: encoder (NVENC, AMF, QuickSync, x264), resolution, frame rate, quality or bitrate, folder and container (MKV, MP4, MOV)
+- Pause and resume, hotkeys, and a live preview of exactly what's being recorded
+- Routing profiles saved with your scene collection, plus import and export
+- Crash recovery: interrupted MKV recordings stay playable and are listed when OBS starts again
+- Automation through obs-websocket (Stream Deck and others)
+- No accounts, services or Streamlabs required
 
 ## Requirements
 
 | | |
 | --- | --- |
-| **OS** | Windows 10 or 11 (x64). Linux and macOS are planned. |
-| **OBS Studio** | 31.1 or newer |
-| **Aitum Vertical Canvas** *(optional)* | 1.6.0 or newer |
+| **OS** | Windows 10 or 11 (x64). macOS and Linux builds are produced but not yet tested. |
+| **OBS Studio** | 31.1 or newer (tested on 33.0.1) |
+| **Aitum Vertical Canvas** *(optional)* | 1.6.0 or newer (tested on 1.6.7) |
 
 ## Installation
 
-No releases yet. Once version 1.0 ships, installers will be published on the [Releases](../../releases) page.
+1. Close OBS.
+2. Download `obs-selective-recording-<version>-windows-x64.zip` from [Releases](../../releases).
+3. Extract it into `C:\ProgramData\obs-studio\plugins\`, so that the DLL ends up at `C:\ProgramData\obs-studio\plugins\obs-selective-recording\bin\64bit\obs-selective-recording.dll`.
+4. Start OBS. The **Selective Recording** dock opens on first run. Afterwards it's under **Docks**.
 
-To build from source, see [docs/BUILDING.md](docs/BUILDING.md).
+For a portable OBS, copy `bin\64bit\*` into OBS's `obs-plugins\64bit` folder and `data\*` into `data\obs-plugins\obs-selective-recording`.
+
+To uninstall, close OBS and delete `C:\ProgramData\obs-studio\plugins\obs-selective-recording`.
+
+## Quick start
+
+1. In the dock, find your alert or chat overlay and click its **Video** button until it shows **Stream only**. It's now left out of the recording.
+2. To record a source that isn't on stream, set it to **Rec only** and hide it in OBS (the eye icon).
+3. Click **Start recording**, or **Start all recordings** to record every canvas.
+
+The [user guide](docs/USER-GUIDE.md) covers everything else.
 
 ## Documentation
 
 | Document | Contents |
 | --- | --- |
-| [Specification](docs/SPECIFICATION.md) | Functional requirements and routing behaviour |
-| [Architecture](docs/ARCHITECTURE.md) | How the plugin works internally |
-| [Roadmap](docs/ROADMAP.md) | Development phases and the v1.0 release checklist |
-| [Configuration](docs/CONFIGURATION.md) | Settings schema and persistence rules |
-| [Building](docs/BUILDING.md) | Compiling and installing from source |
-| [Decision records](docs/adr/) | Key design decisions and why they were made |
+| [User guide](docs/USER-GUIDE.md) | The dock, routes, warnings, settings and hotkeys |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common problems and fixes |
+| [Automation API](docs/API.md) | obs-websocket requests and events |
+| [Specification](docs/SPECIFICATION.md) | Requirements and known limitations |
+| [Architecture](docs/ARCHITECTURE.md) | How it works inside |
+| [Configuration](docs/CONFIGURATION.md) | Where settings are stored, and their format |
+| [Roadmap](docs/ROADMAP.md) | Status and what's next |
+| [Building](docs/BUILDING.md) | Building and testing from source |
+| [Decision records](docs/adr/) | Key design decisions and why |
 
 ## License
 
 Licensed under the [GNU General Public License v2.0 or later](LICENSE), the same license as OBS Studio.
 
-This project is not affiliated with OBS Project, Streamlabs or Aitum.
+This project is not affiliated with the OBS Project, Streamlabs or Aitum.

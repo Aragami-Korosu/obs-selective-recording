@@ -1,6 +1,6 @@
 # 0001. Use `obs_view` instead of the Canvas API
 
-- **Status:** Accepted, partly superseded by [0005](0005-multi-canvas-support.md). Canvases are now read for discovery, and rendering still uses `obs_view`.
+- **Status:** Superseded by [0006](0006-private-canvas-rendering.md). Implementation showed that views give mirrored scenes the wrong size and don't activate hidden sources.
 - **Date:** 2026-11-17
 
 ## Context

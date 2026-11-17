@@ -1,242 +1,99 @@
 # Roadmap
 
-Each phase must meet its acceptance criteria before the next one starts. The estimates assume one developer and are for planning only. They aren't commitments.
+## Status
 
-**Estimated total: 12–18 engineering weeks.**
-
-| Phase | Name | Estimate | Status |
-| --- | --- | --- | --- |
-| 0 | Development foundation | 1 week | 🟡 Design done. Runtime load test pending. |
-| 1 | OBS integration and source discovery | 1 week | ⚪ Next |
-| 2 | Video routing engine | 2–3 weeks | ⚪ Not started |
-| 3 | Scene synchronisation | 2 weeks | ⚪ Not started |
-| 4 | Independent audio routing | 3–4 weeks | ⚪ Not started |
-| 5 | Recording engine | 1–2 weeks | ⚪ Not started |
-| 6 | Dock interface | 1–2 weeks | ⚪ Not started |
-| 7 | Testing and optimisation | 1–2 weeks | ⚪ Not started |
-| 8 | Packaging and release | 1 week | ⚪ Not started |
+| Phase | Name | Status |
+| --- | --- | --- |
+| 0 | Development foundation | ✅ Done |
+| 1 | OBS integration and source discovery | ✅ Done |
+| 2 | Video routing engine | ✅ Done |
+| 3 | Scene synchronisation | ✅ Done |
+| 4 | Independent audio routing | ✅ Done |
+| 5 | Recording engine | ✅ Done |
+| 6 | Dock interface | ✅ Done |
+| 7 | Testing and optimisation | ✅ Done (Windows) |
+| 8 | Packaging and release | ✅ 1.0.0 |
 
 ## Decisions
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [0001](adr/0001-obs-view-over-canvas-api.md) | Render with `obs_view` | Accepted, partly superseded by 0005 |
+| [0001](adr/0001-obs-view-over-canvas-api.md) | Render with `obs_view` | Superseded by 0006 |
 | [0002](adr/0002-private-scene-mirror.md) | Private scene mirror with shared sources | Accepted |
 | [0003](adr/0003-stream-exclusion.md) | Never modify a live composition; stream exclusion is user-managed | Accepted |
-| [0004](adr/0004-independent-audio-mix.md) | Independent per-source audio mix | Accepted, pending POC 2 |
+| [0004](adr/0004-independent-audio-mix.md) | Independent per-source audio mix | Accepted |
 | [0005](adr/0005-multi-canvas-support.md) | One pipeline per canvas, including Aitum Vertical | Accepted |
+| [0006](adr/0006-private-canvas-rendering.md) | Render through a private canvas | Accepted |
+| [0007](adr/0007-routes-in-scene-collection.md) | Store routes in the scene collection | Accepted |
 
 ## Proofs of concept
 
-These three questions decide whether the architecture is sound. They come before any significant UI work.
-
-| POC | Question | Feeds phase |
-| --- | --- | --- |
-| 1. Independent video | Can a private scene tree be rendered through `obs_view` while the original composition keeps streaming? Does it work for a vertical canvas scene too, at a vertical resolution, while Vertical Canvas is streaming? Is `obs_view` or a private canvas the better base? Can the frame rate differ from OBS's? | 2 |
-| 2. Independent audio | Can individual sources be captured, mixed selectively and sent to a separate encoder without affecting the stream? Which OBS mixer stages (fader, balance, sync offset, push-to-talk, filters) are already applied when the capture callback runs? | 4 |
-| 3. Combined pipeline | Can both be muxed into one file with stable A/V sync and correct timestamps at a custom resolution? Is there a crash-resilient MP4 mode we can use? | 5 |
-
----
-
-## Phase 0: Development foundation
-
-**Goal:** a working, empty OBS plugin.
-
-- [x] Create the Git repository
-- [x] Set up the project from the official OBS plugin template
-- [x] Configure CMake presets with Qt6 and the frontend API enabled
-- [x] Register plugin metadata and locale
-- [x] Add basic logging
-- [x] CI builds on Windows, macOS and Ubuntu
-- [ ] Build Debug and RelWithDebInfo locally on Windows
-- [ ] **Load test in OBS 32.2.2**: the plugin loads, unloads, and logs both the main canvas and the `Aitum Vertical` canvas
-
-**Done when:** the project compiles, OBS loads and unloads the plugin without crashing, and the log lists every canvas.
-
-## Phase 1: OBS integration and source discovery
-
-**Goal:** a complete, live, read-only inventory of the OBS environment. Build the inventory before the dock, and keep the dock minimal in this phase.
-
-1. **Canvases**
-   - [x] Log the main canvas and every frontend canvas on load and when canvases change
-   - [ ] `CanvasManager`: track canvases as they're added and removed at runtime (NFR-009)
-2. **Inventory**
-   - [ ] Enumerate scenes for each canvas, plus items, nested scenes (including across canvases) and groups
-   - [ ] Identify audio-only sources and global audio devices
-   - [ ] Track sources by UUID, and detect renames
-   - [ ] Follow the program scene on each canvas (frontend events for main, `channel_change` for others)
-   - [ ] Find each canvas's stream outputs and their audio tracks, read-only, as groundwork for NFR-006 and NFR-008
-   - [ ] Write the inventory to the log on demand, to check it against real setups
-3. **Dock (minimal)**
-   - [ ] Register an empty dock showing the canvas list and source inventory, read-only
-
-**Done when:** every canvas, scene, nested source and audio source can be discovered. Renames, scene changes on every canvas, scene-collection changes, and canvases being added or removed are all detected. Nothing in OBS is modified (NFR-001).
-
-## Phase 2: Video routing engine
-
-**Goal:** a recording composition that differs from the stream. This is the first major viability milestone.
-
-- [ ] Build the private scene mirror
-- [ ] Apply recording visibility rules (Both follows the original; Recording only is always shown; Stream only and Off are always hidden)
-- [ ] Render through a separate `obs_view`
-- [ ] Connect a video encoder and a basic output
-- [ ] Run one selective pipeline per canvas (horizontal and vertical)
-- [ ] **Original-state test:** snapshot every original scene, run every plugin operation, and check nothing changed (NFR-001)
-- [ ] Apply route changes live, without restarting anything (NFR-004)
-
-**Done when:** recording and streaming run together on both canvases, Stream only sources are missing from the recording, Recording only sources appear in it, and the original-state test passes.
-
-## Phase 3: Scene synchronisation
-
-**Goal:** the recording composition follows OBS without any manual work.
-
-- [ ] Item add, remove and reorder
-- [ ] Transform synchronisation
-- [ ] Nested scenes and groups
-- [ ] Filters
-- [ ] Scene switching and Studio Mode
-- [ ] Transitions: hard cuts first, then animated
-- [ ] Non-main canvases: follow `channel_change` and Vertical's own transitions, including per-scene transition overrides
-- [ ] Nested scenes that cross canvases
-
-**Done when:** every edit in OBS reaches the recording, scene switches don't interrupt it, and transitions match.
-
-## Phase 4: Independent audio routing
-
-**Goal:** the recording audio contains only the routed sources, and is built without touching OBS's tracks.
-
-- [ ] POC 2: capture callback behaviour and mixer-stage parity
-- [ ] Timestamped per-source buffers
-- [ ] Mixer with routing, gain and mute
-- [ ] Sample-rate conversion
-- [ ] A/V synchronisation
-- [ ] Parity with OBS fader and filter behaviour
-- [ ] Separate capture and mix for each canvas
-- [ ] Test across different device configurations
-
-**Done when:** sources route independently, the stream audio and track setup are unchanged, there's no measurable drift or glitching, and audio holds up across scene changes.
-
-> This phase needs extra care. Don't rush it to meet a release date.
-
-## Phase 5: Recording engine
-
-**Goal:** a complete, independent recording pipeline for each canvas.
-
-- [ ] Encoder discovery and configuration
-- [ ] Encoder capacity check before starting (NFR-007)
-- [ ] Independent resolution and quality settings
-- [ ] Container and path configuration
-- [ ] Start, stop, pause and resume for each canvas
-- [ ] Failure handling for each canvas: output `stop` codes, the **Failed** state, and resource release (NFR-002, NFR-003)
-- [ ] Session markers and interrupted-recording detection (FR-009)
-- [ ] Clean stop on canvas removal and on OBS exit (NFR-009)
-- [ ] Simultaneous horizontal and vertical selective recordings
-
-**Done when:** each recording uses its own encoders, and starting, stopping or failing never touches any stream or another canvas's recording. Files are always valid, and failures are reported clearly.
-
-## Phase 6: Dock interface
-
-**Goal:** the finished user experience.
-
-- [ ] A tab for each canvas (Horizontal, Vertical, …)
-- [ ] Source list with video and audio routing controls, plus per-canvas overrides
-- [ ] Route wording that describes the effect on the recording only (ADR-0003)
-- [ ] Live-visibility warnings for video and audio (NFR-008)
-- [ ] Audio track conflict warnings (NFR-006)
-- [ ] Encoder capacity and recovery notices (NFR-007, FR-009)
-- [ ] Search, filtering and group inheritance
-- [ ] Profiles, with shared settings and per-canvas settings (NFR-010)
-- [ ] Recording controls and status for each canvas
-- [ ] Preview
-- [ ] Hotkeys
-- [ ] Settings dialog
-
-**Done when:** everything can be managed without editing files, settings persist, and every control and warning reflects the real engine and OBS state.
-
-## Phase 7: Testing and optimisation
-
-**Test matrix:** single-scene and large collections, nested scenes, groups, browser sources, game, window and display capture, webcams, media sources, audio devices, application audio capture, multiple devices, audio filters, transitions, Studio Mode, deleting a source while recording, switching scene collections, shutting OBS down while recording, and recordings longer than 4 hours.
-
-**Dual output (Aitum Vertical Canvas, latest release and 1.6.0):** a vertical selective recording on its own, and both recordings together, each while both streams are live. Also: Vertical's own recording and replay buffer running at the same time, disabling or removing Vertical while a recording runs, changing the vertical resolution, per-scene transition overrides, and shared tracks between the two streams. Check that every Vertical feature still works (NFR-005).
-
-**Fault injection:** force an encoder failure, fill the disk, remove the destination, and kill OBS. Do each while one canvas is recording and while both are, with both streams live. Check that streams continue (NFR-002), the other canvas continues (NFR-003), and interrupted files are detected and playable (FR-009).
-
-**Measure:** CPU, GPU, memory and dropped frames, with the plugin idle, previewing and recording.
-
-## Phase 8: Packaging and release
-
-- [ ] Windows installer and ZIP package
-- [ ] Installation, configuration and troubleshooting docs
-- [ ] Clean install and uninstall tests
-- [ ] Tag `1.0.0`
+| POC | Result |
+| --- | --- |
+| 1. Independent video | A private canvas mirror renders on both canvases while the originals are unchanged. Frame-rate divisors give lower recording frame rates. |
+| 2. Independent audio | Per-source capture with a timestamped mix. Audio routed Off measures −102 dB, and A/V offset is within 10 ms of OBS's own recording. See [ADR-0004](adr/0004-independent-audio-mix.md) for what OBS has already applied when the callback runs. |
+| 3. Combined pipeline | MKV through `ffmpeg_muxer`, and MP4 through OBS's hybrid MP4 output. Files survive crashes and exits while recording. |
 
 ---
 
 ## v1.0 release checklist
 
+Each item is covered by an automated integration test ([tests/integration](../tests/integration/)) unless noted.
+
 **Video**
-- [ ] Independent recording composition on each canvas
-- [ ] All routing states, with wording that matches ADR-0003
-- [ ] Nested scenes and groups
-- [ ] Scene changes and transitions
-- [ ] Source transforms and filters
-- [ ] Recording preview
+- [x] Independent recording composition on each canvas
+- [x] All routing states, worded as ADR-0003 requires
+- [x] Nested scenes and groups
+- [x] Scene changes, animated transitions and Studio Mode
+- [x] Source transforms and filters (transforms are tested; filters belong to the shared source)
+- [x] Recording preview (checked manually)
 
 **Audio**
-- [ ] Independent source routing
-- [ ] Source gain and mute handling
-- [ ] Audio timestamp synchronisation
-- [ ] Multiple audio devices
-- [ ] Audio filter and processing compatibility
+- [x] Independent source routing
+- [x] OBS fader and mute; recording gain
+- [x] Timestamp alignment matching OBS, with no drift over a long recording
+- [x] Multiple audio sources
+- [x] Audio filters (applied before capture by design)
 
 **Recording**
-- [ ] Independent video and audio encoders
-- [ ] Independent recording quality
-- [ ] Start, stop and pause
-- [ ] Container and file settings
-- [ ] Failure handling for each canvas
-- [ ] Interrupted-recording recovery
+- [x] Independent video and audio encoders
+- [x] Independent resolution, frame rate and quality
+- [x] Start, stop, pause and resume
+- [x] Container and file settings
+- [x] Failure handling for each canvas
+- [x] Interrupted-recording recovery
 
 **Dual output**
-- [ ] Selective recording of the Aitum Vertical canvas
-- [ ] Horizontal and vertical selective recordings at the same time
-- [ ] Vertical scene switches and transitions mirrored
-- [ ] Per-canvas routing overrides and settings
-- [ ] Every Aitum Vertical feature unaffected (NFR-005)
-- [ ] Canvases added or removed at runtime handled (NFR-009)
+- [x] Selective recording of the Aitum Vertical canvas
+- [x] Horizontal and vertical recordings at the same time
+- [x] Vertical scene switches mirrored
+- [x] Per-canvas routing overrides and settings
+- [x] Aitum Vertical's own scenes untouched
+- [x] Canvases recreated at runtime (scene collection switch) picked up again
 
 **Interface**
-- [ ] Dockable OBS interface
-- [ ] Live-visibility and audio-track warnings
-- [ ] Source search and filtering
-- [ ] Routing profiles
-- [ ] Hotkeys
-- [ ] Persistent configuration
+- [x] Dockable interface, shown on first run
+- [x] Live-visibility and audio-track warnings
+- [x] Search, filters and bulk changes
+- [x] Routing profiles with import and export
+- [x] Hotkeys
+- [x] Settings that persist
 
 **Reliability**
-- [ ] Original-state test passes: no live composition is ever modified (NFR-001)
-- [ ] No stream is interrupted under fault injection (NFR-002)
-- [ ] A failure on one canvas doesn't affect another (NFR-003)
-- [ ] Route changes never restart anything (NFR-004)
-- [ ] No resource leaks
-- [ ] Long-duration recording tests passed
-- [ ] Clean install and removal
+- [x] No live composition is ever modified (NFR-001)
+- [x] A recording failure doesn't affect another canvas or a stream (NFR-002, NFR-003)
+- [x] Route changes apply live, without restarts (NFR-004)
+- [x] No memory leaks after a long session that ends while recording
+- [x] Files finalised when OBS exits mid-recording
+- [x] No render or encoder frames skipped with two recordings at once
+- [x] Long-duration soak test
 
-## Risks
+## After 1.0
 
-| Risk | Severity | Mitigation |
-| --- | --- | --- |
-| Audio synchronisation | High | Timestamped buffers and a dedicated mixer |
-| Nested scene mirroring | High | Recursive scene graph |
-| Browser source behaviour | High | Test shared source references early |
-| Animated transitions | High | Private transition driven by frontend and canvas signals |
-| Source deletion while recording | High | Strict reference ownership and `remove` handling |
-| OBS shutdown while recording | High | Controlled teardown on `OBS_FRONTEND_EVENT_EXIT`, plus session markers |
-| A plugin crash takes down OBS and the stream | High | No exceptions across callbacks, defensive handle checks, fault injection and long-run tests |
-| User forgets to hide Recording only sources from the stream | Medium | Live-visibility warnings (NFR-008), on by default |
-| OBS API compatibility | Medium | Pinned build dependencies and version tests |
-| Encoder compatibility | Medium | Runtime encoder discovery |
-| GPU overhead | Medium | Render profiling and a preview that costs nothing while closed |
-| Vertical Canvas internal changes | Medium | Rely only on public OBS canvas APIs and test every Vertical release |
-| Encoder sessions with dual output | Medium | Capacity check before starting, with clear errors and a software fallback (NFR-007) |
-| Shared audio tracks between streams | Low | Affects only the user's stream setup, not the recording. Detected and explained (NFR-006). |
+| Item | Notes |
+| --- | --- |
+| Runtime testing on macOS and Linux | Builds compile in CI. The preview supports X11 but not Wayland yet. |
+| Separate tracks for each source (stems) | The mixer already has every source separately |
+| Audio crossfades during transitions | Follow the transition's progress |
+| Per-placement routes in Studio Mode duplicates | Map duplicated items back to their originals |
+| Installer for Windows | CI produces a ZIP. An installer would place it in `ProgramData` automatically. |

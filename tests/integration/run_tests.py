@@ -201,6 +201,18 @@ def test_main_recording(h):
     check("live: yellow box still on stream", h.live_color("SR Test A", 1500, 300) == "yellow")
 
 
+def test_gain(h):
+    print("Recording gain")
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+    h.obs.vendor("SetRoute", {"source_name": "SR Tone 440", "gain_db": 0.0})
+    loud = media.tone_levels(h.record("main", 3), [440], start=0.8, duration=1.5)["rms"]
+    h.obs.vendor("SetRoute", {"source_name": "SR Tone 440", "gain_db": -20.0})
+    quiet = media.tone_levels(h.record("main", 3), [440], start=0.8, duration=1.5)["rms"]
+    h.obs.vendor("SetRoute", {"source_name": "SR Tone 440", "gain_db": 0.0})
+    drop = 20 * __import__("math").log10(max(quiet, 1e-9) / max(loud, 1e-9))
+    check("-20 dB recording gain lowers the recorded level by about 20 dB", -22 < drop < -18, f"{drop:.1f} dB")
+
+
 def test_warnings(h):
     print("Warnings")
     warnings = h.obs.vendor("GetWarnings")["warnings"]
@@ -536,7 +548,7 @@ def main():
     process.start()
     h = Harness(connect(args.url), args.workdir)
 
-    tests = [test_discovery, setup, test_main_recording, test_warnings, test_vertical,
+    tests = [test_discovery, setup, test_main_recording, test_gain, test_warnings, test_vertical,
              test_failure_isolation, test_pause, test_groups, test_studio_mode, test_transition_blend,
              test_source_removed, test_hotkey, test_av_sync, test_performance, test_disabled,
              test_collection_switch]

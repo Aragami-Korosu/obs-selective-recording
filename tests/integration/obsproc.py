@@ -25,25 +25,30 @@ class ObsProcess:
             cwd=self.bin)
         return self.proc.pid
 
-    def _windows(self):
-        handles = []
+    def _main_window(self):
+        """OBS's main window; floating docks are separate windows and must not be closed."""
+        found = []
 
         @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
         def callback(hwnd, _):
             pid = wintypes.DWORD()
             user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
             if pid.value == self.proc.pid and user32.IsWindowVisible(hwnd):
-                handles.append(hwnd)
+                title = ctypes.create_unicode_buffer(256)
+                user32.GetWindowTextW(hwnd, title, 256)
+                if title.value.startswith("OBS "):
+                    found.append(hwnd)
             return True
 
         user32.EnumWindows(callback, 0)
-        return handles
+        return found[0] if found else None
 
     def close(self, timeout=30):
-        """Asks OBS to exit normally so it runs its full shutdown."""
+        """Closes the main window like a user would, so OBS runs its full shutdown."""
         if not self.proc or self.proc.poll() is not None:
             return True
-        for hwnd in self._windows():
+        hwnd = self._main_window()
+        if hwnd:
             user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
         try:
             self.proc.wait(timeout)

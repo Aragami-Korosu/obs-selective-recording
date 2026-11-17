@@ -38,7 +38,7 @@
     },
     "name": "obs-selective-recording",
     "displayName": "OBS Selective Recording",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "author": "Aragami Korosu",
     "website": "https://github.com/Linux-bootloader/obs-selective-recording",
     "email": "ak@aragamikorosu.live"

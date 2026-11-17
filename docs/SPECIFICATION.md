@@ -1,6 +1,6 @@
 # Specification
 
-**Status:** Draft v1.0 · **Platform:** Windows x64 first, with a portable architecture
+**Status:** v1.0 · **Platform:** Windows x64, tested on OBS 33.0.1 with Aitum Vertical 1.6.7. macOS and Linux builds compile but haven't been tested at runtime.
 
 ## 1. Product vision
 
@@ -112,7 +112,7 @@ The plugin needs to match OBS mixer behaviour, including volume, balance, sync o
 | Video encoder | NVENC, QuickSync, AMF or x264, discovered at runtime |
 | Audio encoder | AAC, plus Opus where the container allows it |
 | Resolution | Independent. Defaults to the canvas's base resolution. |
-| Frame rate | Follows OBS's global frame rate. libobs renders every canvas and view on one render loop. POC 1 will confirm whether a lower rate (for example 30 fps from a 60 fps canvas) is possible. |
+| Frame rate | OBS's frame rate, or a half, third or quarter of it (an encoder frame-rate divisor) |
 | Video quality and audio bitrate | Independent |
 | Output directory and filename format | Configurable |
 | Pause and resume | Required |
@@ -184,7 +184,7 @@ Routing must survive OBS restarts, scene and scene-collection changes, source re
 | A canvas is removed while recording | Stop that canvas's recording cleanly, and keep the file. |
 | A source is deleted while recording | Remove it from the mirror. The recording continues. |
 | OBS exits normally while recording | Stop and finalise every recording before the plugin unloads. |
-| OBS crashes or the power fails | The file stays playable (MKV, or a crash-resilient MP4 mode if POC 3 confirms one). On the next start, the plugin reports the interrupted recording and offers to remux it. |
+| OBS crashes or the power fails | The file stays playable (MKV, or OBS's hybrid MP4 output where available). On the next start, the dock lists the interrupted recording and links to it. OBS's **File → Remux Recordings** converts it to MP4. |
 
 The plugin records a session marker for each active recording. It removes the marker when the recording stops cleanly, and checks for leftover markers at startup.
 
@@ -205,7 +205,18 @@ The plugin records a session marker for each active recording. It removes the ma
 
 **Scope of NFR-002 and NFR-003.** The plugin runs inside the OBS process. A crash in plugin code takes OBS down with it, and the stream with it. These requirements cover failures the plugin can catch and handle. Crash risk is reduced by strict reference ownership, never letting C++ exceptions cross into libobs callbacks, defensive checks on every OBS handle, and the long-run tests in Phase 7.
 
-## 5. Out of scope for v1.0
+## 5. Known limitations in v1.0
+
+| Limitation | Effect |
+| --- | --- |
+| Audio transitions | Recording audio follows routes immediately. It doesn't crossfade during scene transitions or item show/hide fades. |
+| Show/hide transitions on items | Mirrored items appear and disappear instantly |
+| Studio Mode with Duplicate Scene | Per-placement routes don't apply to OBS's duplicated program scene. Source and canvas routes do. |
+| Nested scenes from another canvas | Use the size of the canvas being recorded |
+| OBS 33 log line | `Attempted to add Scene without specifying a canvas!` appears once for each mirrored scene when a recording or preview starts. It's harmless (see [ADR-0006](adr/0006-private-canvas-rendering.md)). |
+| Hardware encoder limits | Detected when a recording starts (with an optional fallback to x264), not predicted in advance |
+
+## 6. Out of scope for v1.0
 
 - Separate audio tracks (stems) for each source
 - File splitting and automatic remuxing during recording

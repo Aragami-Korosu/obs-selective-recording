@@ -1,146 +1,131 @@
 # Configuration
 
-> **Status:** proposed schema. It will be finalised in Phase 6.
+Everything can be changed from the dock and the Settings dialog. This page documents the files behind them, for support, backups and automation.
 
-## Storage
+## Where settings live
 
-Files live in the plugin's config directory, which `obs_module_config_path()` returns. On Windows, that's:
+| Data | Location | Why |
+| --- | --- | --- |
+| Routing profiles | Inside each scene collection, under `selective-recording` | Routes refer to source UUIDs, which belong to a collection ([ADR-0007](adr/0007-routes-in-scene-collection.md)) |
+| Recording and warning settings | `settings.json` in the plugin config folder | About the machine, not the scenes |
+| Global hotkey | `hotkeys.json` in the plugin config folder | |
+| Per-canvas hotkeys | Inside `settings.json` | |
+| Recovery markers | `sessions/` in the plugin config folder | One per active recording |
 
-```
-%APPDATA%\obs-studio\plugin_config\obs-selective-recording\
-├── settings.json        # Profiles, routes and recording preferences
-└── sessions\            # One marker per active recording (see Recovery)
-```
+The plugin config folder is `%APPDATA%\obs-studio\plugin_config\obs-selective-recording\` on Windows, or `config/obs-studio/plugin_config/obs-selective-recording/` in a portable OBS. Files are written atomically and keep a `.bak` copy.
 
-The plugin writes files atomically: it writes to a temporary file, then renames it over the original. That way a crash can't leave a half-written file behind.
-
-## Schema
+## Routing profiles (scene collection)
 
 ```json
-{
+"selective-recording": {
   "schema_version": 1,
-  "plugin_enabled": true,
   "active_profile": "default",
   "profiles": [
     {
       "id": "default",
-      "name": "Default Recording",
-      "scene_collection": null,
-
+      "name": "Default",
       "default_video_route": "both",
       "default_audio_route": "both",
       "source_routes": {
-        "<source-uuid>": { "video": "both", "audio": "recording_only" }
+        "<source-uuid>": { "video": "stream_only", "audio": "off", "gain_db": -6.0 }
+      },
+      "canvases": {
+        "Aitum Vertical": {
+          "source_routes": { "<source-uuid>": { "video": "off" } }
+        }
       },
       "item_overrides": {
-        "<scene-uuid>/<item-id>": { "video": "stream_only" }
-      },
-
-      "recording": {
-        "container": "mkv",
-        "audio_encoder": "aac",
-        "audio_bitrate": 192,
-        "audio_sample_rate": 48000,
-        "filename_format": "%CCYY-%MM-%DD %hh-%mm-%ss",
-        "offer_recovery": true
-      },
-
-      "warnings": {
-        "live_visibility": true,
-        "audio_tracks": true
-      },
-
-      "canvases": {
-        "main": {
-          "enabled": true,
-          "source_routes": {},
-          "recording": {
-            "width": 0,
-            "height": 0,
-            "video_encoder": "auto",
-            "video_quality": {},
-            "output_directory": ""
-          }
-        },
-        "Aitum Vertical": {
-          "enabled": true,
-          "source_routes": {
-            "<source-uuid>": { "video": "off" }
-          },
-          "recording": {
-            "width": 0,
-            "height": 0,
-            "video_encoder": "auto",
-            "video_quality": {},
-            "output_directory": "",
-            "filename_format": "%CCYY-%MM-%DD %hh-%mm-%ss Vertical"
-          }
-        }
+        "<scene-uuid>/<item-id>": { "video": "recording_only" }
       }
     }
   ]
 }
 ```
 
-### What's shared and what's per canvas
-
-| Level | Contents |
-| --- | --- |
-| **Profile** (shared by every canvas) | Default routes, source routes, item overrides, global recording preferences (`recording`), warning preferences |
-| **Canvas** (`canvases.<name>`) | Whether it's enabled, source route overrides, resolution, video encoder and quality, destination. A canvas can also override any profile-level `recording` field, such as `filename_format` above. |
-
-When the plugin builds a canvas's recording settings, it starts from the profile's `recording` object and applies the canvas's `recording` object on top.
-
 ### Route values
 
-`both`, `stream_only`, `recording_only` and `off`. Any unknown value is treated as `both`.
+| Value | In the recording | Stream (set by you in OBS) |
+| --- | --- | --- |
+| `both` | Included | Unchanged |
+| `stream_only` | Excluded | Unchanged |
+| `recording_only` | Included, even when hidden live | You hide it; the plugin warns if it's still live |
+| `off` | Excluded | You hide it; the plugin warns if it's still live |
 
-A route controls what goes into the **recording**. For `recording_only` and `off`, it also tells the plugin to warn if the source is still live on that canvas. A route never changes OBS ([ADR-0003](adr/0003-stream-exclusion.md)).
+A route never changes OBS ([ADR-0003](adr/0003-stream-exclusion.md)). Any unknown value is treated as `both`.
 
-### Fields
+### Resolution order
 
-| Field | Notes |
-| --- | --- |
-| `schema_version` | Incremented on every breaking change. Migrations run in order on load. |
-| `plugin_enabled` | When `false`, every recording includes every source. |
-| `profiles[].scene_collection` | Optional. If set, the profile activates when that scene collection loads. |
-| `source_routes` (profile level) | Keyed by source UUID, so routes survive renames. These apply on every canvas. |
-| `item_overrides` | Keyed by the scene UUID plus the scene-item ID. Scene items belong to exactly one canvas, so no canvas key is needed. Either `video` or `audio` can be left out to inherit. |
-| `recording.offer_recovery` | Offer to remux interrupted recordings at startup. |
-| `warnings.*` | Turn off individual warning types (NFR-006, NFR-008). Both are on by default. |
-| `canvases` | Keyed by canvas name. `main` is reserved for OBS's main canvas. Names are used instead of UUIDs because plugins like Vertical Canvas look up their canvas by a fixed name. |
-| `canvases.*.enabled` | Whether this canvas has a selective recording pipeline. |
-| `canvases.*.source_routes` | Per-canvas overrides of the profile-level `source_routes`. |
-| `canvases.*.recording.width` / `height` | `0` means the canvas's base resolution, which follows the canvas if it changes. |
-| `canvases.*.recording.video_encoder` | `auto` picks the best hardware encoder with free capacity, falling back to x264. |
-| `canvases.*.recording.video_quality` | Settings passed to the chosen encoder (rate control, bitrate or CQ, preset). They're specific to that encoder. |
-| `canvases.*.recording.output_directory` | An empty value means the OBS recording path is used. |
+The first match wins:
 
-There's no frame-rate field. Recordings follow OBS's global frame rate, because canvases and views render on the main render loop. If POC 1 shows that a lower frame rate is possible, a field will be added.
-
-## Resolution order
-
-A source's effective route on a given canvas is the first match in this list:
-
-1. `item_overrides` for this scene item
+1. `item_overrides` for this placement (video only)
 2. `canvases.<canvas>.source_routes` for this source
-3. Profile-level `source_routes` for this source
-4. The route inherited from the parent group or nested scene
-5. The profile's `default_*_route`
-6. `both`
+3. `source_routes` for this source
+4. The profile's `default_*_route`
+5. `both`
 
-## Recovery
+Groups and nested scenes pass routes down naturally. A hidden parent hides its children in the recording, and a Recording only parent shows them.
 
-Each active recording has a marker file, `sessions/<recording-id>.json`, where the ID is generated when the recording starts:
+`gain_db` adds gain to the recording only, from −30 to +20 dB. The OBS volume fader is always applied as well.
+
+## settings.json
 
 ```json
-{ "canvas": "Aitum Vertical", "path": "D:/Videos/2026-11-17 20-15-02 Vertical.mkv", "container": "mkv", "started": "2026-11-17T20:15:02+10:00" }
+{
+  "schema_version": 1,
+  "plugin_enabled": true,
+  "offer_recovery": true,
+  "dock_introduced": true,
+  "recording": {
+    "container": "mkv",
+    "audio_encoder": "ffmpeg_aac",
+    "audio_bitrate": 192,
+    "filename_format": "%CCYY-%MM-%DD %hh-%mm-%ss",
+    "fallback_to_software": true
+  },
+  "warnings": { "live_visibility": true, "audio_tracks": true },
+  "canvases": {
+    "main": {
+      "enabled": true,
+      "width": 0, "height": 0,
+      "fps_divisor": 1,
+      "video_encoder": "auto",
+      "rate_control": "quality",
+      "quality": 20,
+      "bitrate": 12000,
+      "output_directory": "",
+      "filename_suffix": "",
+      "hotkeys": { "toggle": [], "pause": [] }
+    }
+  }
+}
 ```
 
-The plugin deletes the marker when the recording stops cleanly. Any marker left at startup means that recording was interrupted (see the [specification](SPECIFICATION.md#37-recovery)).
+| Field | Meaning |
+| --- | --- |
+| `plugin_enabled` | When `false`, recordings include every source exactly as it appears live |
+| `offer_recovery` | Check for interrupted recordings at startup |
+| `recording.container` | `mkv` (recommended), `mp4` or `mov` |
+| `recording.audio_encoder` | `ffmpeg_aac` or `ffmpeg_opus` |
+| `recording.filename_format` | The same codes as OBS's filename format |
+| `recording.fallback_to_software` | Retry with x264 if a hardware encoder can't start |
+| `canvases` | Keyed by canvas: `main` for OBS's main canvas, otherwise the canvas name (for example `Aitum Vertical`) |
+| `width`, `height` | `0` means the canvas's base resolution |
+| `fps_divisor` | `1` = OBS's frame rate, `2` = half, `3` = one third, `4` = one quarter |
+| `video_encoder` | `auto`, or an encoder ID such as `obs_x264`, `obs_nvenc_h264_tex` or `h264_texture_amf` |
+| `rate_control` | `quality` (CRF or CQP) or `bitrate` (CBR) |
+| `quality` | 1–51. Lower is better quality and bigger files |
+| `bitrate` | In kbps, used when `rate_control` is `bitrate` |
+| `output_directory` | Empty means OBS's recording folder |
+| `filename_suffix` | Added to the filename. Empty means the canvas name, for canvases other than main |
 
-## Housekeeping
+Settings for a canvas that's currently missing are kept, so uninstalling Vertical Canvas temporarily doesn't erase them (NFR-010).
 
-- Entries for sources that no longer exist are removed when a scene collection loads, but only after every source and canvas has finished loading. This stops a slow-loading collection, or a plugin canvas that appears late, from losing its routes.
-- Settings for a canvas that is currently missing are kept, so uninstalling Vertical Canvas temporarily doesn't erase them (NFR-010).
-- Import and export use the same profile object as above.
+## Recovery markers
+
+`sessions/<id>.json` is written when a recording starts and deleted when it stops cleanly:
+
+```json
+{ "canvas": "main", "path": "D:/Videos/2026-11-17 20-15-02.mkv", "container": "mkv", "started": "2026-11-17T20:15:02" }
+```
+
+A marker that's still there at startup means the recording was interrupted. The dock lists it until you dismiss it.
