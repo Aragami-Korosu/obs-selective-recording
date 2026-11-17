@@ -17,7 +17,7 @@ from PIL import Image
 
 import media
 from obsproc import ObsProcess
-from obsws import Client
+from obsws import Client, RequestError
 
 VERTICAL = "Aitum Vertical"
 
@@ -469,7 +469,15 @@ def test_disabled(h):
 
 def connect(url):
     obs = Client(url, timeout=90)
-    wait_for(lambda: len(obs.vendor("GetStatus").get("canvases", [])) > 1, 30)
+
+    def ready():
+        try:
+            return len(obs.vendor("GetStatus").get("canvases", [])) > 1
+        except RequestError:
+            return False  # OBS answers "not ready" while it is still loading
+
+    if not wait_for(ready, 90, interval=1):
+        raise RuntimeError("the plugin never became ready")
     return obs
 
 

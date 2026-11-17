@@ -51,6 +51,9 @@ private:
 		std::vector<OBSSignal> group_signals;
 		std::vector<OBSSource> groups;
 		bool dirty = true;
+		// Private scenes OBS puts on air directly, such as Studio Mode's duplicated program scene.
+		bool ephemeral = false;
+		int unused_checks = 0;
 	};
 
 	struct Link {
@@ -74,6 +77,7 @@ private:
 	void destroy(Mirrored &m);
 	void rebuild_dirty();
 	void sync_scene_list();
+	void sync_on_air_scenes();
 	void ensure_transition();
 	void connect_scene_signals(obs_source_t *scene_source, std::vector<OBSSignal> &out);
 	void mark_dirty_containing(obs_source_t *scene_or_group);
@@ -102,6 +106,7 @@ private:
 	// Read by signal handlers and the graphics thread.
 	mutable std::mutex map_mutex_;
 	std::unordered_map<obs_source_t *, OBSSource> scene_map_;
+	std::unordered_map<std::string, OBSSource> scene_names_;
 	std::unordered_map<obs_sceneitem_t *, Link> links_;
 	OBSSource transition_;
 	obs_source_t *transition_original_ = nullptr;

@@ -78,6 +78,7 @@ SceneMirror::SceneMirror(obs_canvas_t *source_canvas, uint32_t output_width, uin
 
 	sync_scene_list();
 	rebuild_dirty();
+	sync_on_air_scenes();
 	ensure_transition();
 
 	obs_add_tick_callback(tick, this);
@@ -104,6 +105,7 @@ SceneMirror::~SceneMirror()
 		std::lock_guard lock(map_mutex_);
 		links_.clear();
 		scene_map_.clear();
+		scene_names_.clear();
 		transition_ = nullptr;
 	}
 
@@ -263,6 +265,12 @@ void SceneMirror::destroy(Mirrored &m)
 	{
 		std::lock_guard lock(map_mutex_);
 		scene_map_.erase(m.original.Get());
+		for (auto it = scene_names_.begin(); it != scene_names_.end();) {
+			if (m.mirror && it->second.Get() == obs_scene_get_source(m.mirror))
+				it = scene_names_.erase(it);
+			else
+				++it;
+		}
 		for (auto it = links_.begin(); it != links_.end();) {
 			if (it->second.owner == m.original)
 				it = links_.erase(it);
@@ -375,11 +383,59 @@ void SceneMirror::refresh_visibility()
 	}
 }
 
+void SceneMirror::sync_on_air_scenes()
+{
+	std::vector<OBSSource> on_air;
+	OBSSourceAutoRelease channel = obs_canvas_get_channel(source_canvas_, 0);
+	if (channel && obs_source_get_type(channel) == OBS_SOURCE_TYPE_TRANSITION) {
+		for (auto target : {OBS_TRANSITION_SOURCE_A, OBS_TRANSITION_SOURCE_B}) {
+			OBSSourceAutoRelease source = obs_transition_get_source(channel, target);
+			if (source)
+				on_air.emplace_back(source.Get());
+		}
+	} else if (channel) {
+		on_air.emplace_back(channel.Get());
+	}
+
+	// Studio Mode can put a private duplicate of a scene on air; mirror it like any other.
+	const std::vector<OBSSource> listed = canvas_scenes(source_canvas_);
+	for (auto &source : on_air) {
+		if (!obs_source_is_scene(source) || mirrors_.count(source))
+			continue;
+		Mirrored *m = mirror_for(source, true);
+		if (m && !contains_source(listed, source))
+			m->ephemeral = true;
+	}
+
+	for (auto it = mirrors_.begin(); it != mirrors_.end();) {
+		Mirrored &m = *it->second;
+		if (!m.ephemeral || contains_source(on_air, it->first)) {
+			m.unused_checks = 0;
+			++it;
+			continue;
+		}
+		if (++m.unused_checks < 8) {
+			++it;
+			continue;
+		}
+		destroy(m);
+		it = mirrors_.erase(it);
+	}
+
+	std::lock_guard lock(map_mutex_);
+	scene_names_.clear();
+	for (auto &[original, m] : mirrors_) {
+		if (!m->ephemeral)
+			scene_names_[source_name(original)] = obs_scene_get_source(m->mirror);
+	}
+}
+
 void SceneMirror::reconcile()
 {
 	if (!canvas_ || suspended_)
 		return;
 	rebuild_dirty();
+	sync_on_air_scenes();
 	ensure_transition();
 }
 
@@ -408,6 +464,7 @@ void SceneMirror::resume()
 	suspended_ = false;
 	sync_scene_list();
 	rebuild_dirty();
+	sync_on_air_scenes();
 	ensure_transition();
 }
 
@@ -495,12 +552,21 @@ void SceneMirror::tick_transition()
 	{
 		std::lock_guard lock(map_mutex_);
 		transition = transition_;
-		auto a = scene_map_.find(original_a.Get());
-		if (a != scene_map_.end())
-			mirror_a = a->second;
-		auto b = scene_map_.find(original_b.Get());
-		if (b != scene_map_.end())
-			mirror_b = b->second;
+
+		// A scene we haven't mirrored yet (a fresh Studio Mode duplicate) falls back to the
+		// mirror of the scene it was copied from until its own mirror is ready.
+		auto lookup = [this](obs_source_t *original) -> OBSSource {
+			if (!original)
+				return nullptr;
+			auto it = scene_map_.find(original);
+			if (it != scene_map_.end())
+				return it->second;
+			const char *name = obs_source_get_name(original);
+			auto named = name ? scene_names_.find(name) : scene_names_.end();
+			return named != scene_names_.end() ? named->second : nullptr;
+		};
+		mirror_a = lookup(original_a);
+		mirror_b = lookup(original_b);
 	}
 	if (!transition)
 		return;
