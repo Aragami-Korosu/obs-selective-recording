@@ -96,4 +96,3 @@ Each item is covered by an automated integration test ([tests/integration](../te
 | Separate tracks for each source (stems) | The mixer already has every source separately |
 | Audio crossfades during transitions | Follow the transition's progress |
 | Per-placement routes in Studio Mode duplicates | Map duplicated items back to their originals |
-| Installer for Windows | CI produces a ZIP. An installer would place it in `ProgramData` automatically. |

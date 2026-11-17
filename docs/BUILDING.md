@@ -76,6 +76,18 @@ build-aux/run-gersemi        # CMake
 
 These scripts need a POSIX shell, so on Windows run them from Git Bash or WSL.
 
+## Packaging
+
+`.github/scripts/Package-Windows.ps1` makes the ZIP and the installer. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). To build it by hand after `cmake --install`:
+
+```powershell
+& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DProductVersion=1.0.0 `
+  /DSourceDir=release\RelWithDebInfo\obs-selective-recording /DOutputDir=release `
+  /DOutputName=obs-selective-recording-1.0.0-windows-x64-installer packaging\windows\installer.iss
+```
+
+For a silent test install that doesn't need administrator rights, run the installer with `/CURRENTUSER /VERYSILENT /DIR=<folder>`.
+
 ## Testing
 
 The end-to-end tests run the plugin inside a disposable, portable OBS, record through it, and check the files with ffmpeg. See [tests/integration/README.md](../tests/integration/README.md).

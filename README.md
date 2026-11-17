@@ -44,14 +44,19 @@ Streamlabs turns off Selective Recording when Dual Output is on. This plugin is 
 
 ## Installation
 
+### Installer (recommended)
+
 1. Close OBS.
-2. Download `obs-selective-recording-<version>-windows-x64.zip` from [Releases](../../releases).
-3. Extract it into `C:\ProgramData\obs-studio\plugins\`, so that the DLL ends up at `C:\ProgramData\obs-studio\plugins\obs-selective-recording\bin\64bit\obs-selective-recording.dll`.
-4. Start OBS. The **Selective Recording** dock opens on first run. Afterwards it's under **Docks**.
+2. Download `obs-selective-recording-<version>-windows-x64-installer.exe` from [Releases](../../releases) and run it.
+3. Start OBS. The **Selective Recording** dock opens on first run (afterwards it's under **Docks**), and a recording button appears next to each source in the Sources list.
+
+The installer checks your OBS version and won't run while OBS is open. To uninstall, use **Settings → Apps → Installed apps → OBS Selective Recording**. Your settings are kept in case you reinstall.
+
+### ZIP (manual or portable OBS)
+
+Extract `obs-selective-recording-<version>-windows-x64.zip` into `C:\ProgramData\obs-studio\plugins\`, so the DLL ends up at `...\plugins\obs-selective-recording\bin\64bit\obs-selective-recording.dll`.
 
 For a portable OBS, copy `bin\64bit\*` into OBS's `obs-plugins\64bit` folder and `data\*` into `data\obs-plugins\obs-selective-recording`.
-
-To uninstall, close OBS and delete `C:\ProgramData\obs-studio\plugins\obs-selective-recording`.
 
 ## Quick start
 
