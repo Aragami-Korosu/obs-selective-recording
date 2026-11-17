@@ -16,6 +16,7 @@ import time
 from PIL import Image
 
 import media
+from obsproc import ObsProcess
 from obsws import Client
 
 VERTICAL = "Aitum Vertical"
@@ -345,6 +346,118 @@ def test_av_sync(h):
     h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
 
 
+def test_studio_mode(h):
+    print("Studio Mode follows program, not preview")
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+    h.obs.call("SetStudioModeEnabled", {"studioModeEnabled": True})
+    time.sleep(1)
+    h.obs.call("SetCurrentPreviewScene", {"sceneName": "SR Test B"})
+
+    def transition(start):
+        time.sleep(2.0)
+        h.obs.call("TriggerStudioModeTransition")
+
+    path = h.record("main", 4.5, during=transition)
+    check("preview scene not recorded before transition", media.pixel(path, 1.0, 1000, 500) == "red",
+          media.pixel(path, 1.0, 1000, 500))
+    check("program scene recorded after transition", media.pixel(path, 3.8, 1000, 500) == "magenta",
+          media.pixel(path, 3.8, 1000, 500))
+    h.obs.call("SetStudioModeEnabled", {"studioModeEnabled": False})
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+    time.sleep(1)
+
+
+def test_transition_blend(h):
+    print("Animated transitions are mirrored")
+    h.obs.call("SetCurrentSceneTransition", {"transitionName": "Fade"}, allow_fail=True)
+    h.obs.call("SetCurrentSceneTransitionDuration", {"transitionDuration": 3000})
+
+    def switch(start):
+        time.sleep(1.0)
+        h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test B"})
+
+    path = h.record("main", 5.5, during=switch)
+    r, g, b = media.pixel_rgb(path, 2.6, 1000, 500)
+    check("mid-fade frame is a blend of both scenes", r > 200 and 50 < b < 220, f"rgb({r},{g},{b})")
+    check("fade finishes on the new scene", media.pixel(path, 5.0, 1000, 500) == "magenta")
+    h.obs.call("SetCurrentSceneTransitionDuration", {"transitionDuration": 300})
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+    time.sleep(1)
+
+
+def test_source_removed(h):
+    print("Deleting a source while recording")
+    h.obs.call("CreateInput", {
+        "sceneName": "SR Test A", "inputName": "SR Temp Box", "inputKind": "color_source_v3",
+        "inputSettings": {"color": GREEN, "width": 200, "height": 200}, "sceneItemEnabled": True})
+    item = h.obs.call("GetSceneItemId", {"sceneName": "SR Test A", "sourceName": "SR Temp Box"})["sceneItemId"]
+    h.obs.call("SetSceneItemTransform", {"sceneName": "SR Test A", "sceneItemId": item,
+                                         "sceneItemTransform": {"positionX": 800, "positionY": 750}})
+    time.sleep(1)
+
+    def remove(start):
+        time.sleep(1.5)
+        h.obs.call("RemoveInput", {"inputName": "SR Temp Box"})
+
+    path = h.record("main", 4, during=remove)
+    check("recording survives source deletion", h.status("main")["state"] == "idle", h.status("main")["state"])
+    check("deleted source shown before deletion", media.pixel(path, 0.8, 900, 850) == "green")
+    check("deleted source gone afterwards", media.pixel(path, 3.5, 900, 850) == "red")
+
+
+def test_collection_switch(h):
+    print("Scene collection switch while recording")
+    h.obs.vendor("StartRecording", {"canvas": "main"})
+    wait_for(lambda: h.status("main")["state"] == "recording", 10)
+    h.obs.call("CreateSceneCollection", {"sceneCollectionName": "SR Other"}, allow_fail=True)
+    time.sleep(3)
+    h.obs.call("SetCurrentSceneCollection", {"sceneCollectionName": "Test"})
+    time.sleep(3)
+    state = h.status("main")["state"] if h.status("main") else "missing"
+    check("recording continues through the switch", state == "recording", state)
+    path = h.status("main")["file"] if h.status("main") else ""
+    h.obs.vendor("StopRecording", {"canvas": "main"})
+    wait_for(lambda: h.status("main")["state"] == "idle", 20)
+    if path:
+        duration = float(media.probe(path)["format"]["duration"])
+        check("recording file valid after the switch", duration > 5, f"{duration:.1f}s")
+    route = h.obs.vendor("GetRoute", {"source_name": "SR Box Green"})
+    check("routes restored with the collection", route.get("video") == "stream_only", route)
+
+
+def test_hotkey(h):
+    print("Hotkeys")
+    h.obs.call("TriggerHotkeyByName", {"hotkeyName": "selective_recording.toggle.main"})
+    started = wait_for(lambda: h.status("main")["state"] == "recording", 5)
+    check("hotkey starts recording", started)
+    time.sleep(1.5)
+    h.obs.call("TriggerHotkeyByName", {"hotkeyName": "selective_recording.toggle.main"})
+    stopped = wait_for(lambda: h.status("main")["state"] == "idle", 10)
+    check("hotkey stops recording", stopped)
+
+
+def test_performance(h):
+    print("Rendering overhead")
+    before = h.obs.call("GetStats")
+    h.obs.vendor("StartRecording")
+    wait_for(lambda: all(c["state"] == "recording" for c in h.obs.vendor("GetStatus")["canvases"]), 10)
+    time.sleep(8)
+    during = h.obs.vendor("GetStatus")["canvases"]
+    h.obs.vendor("StopRecording")
+    wait_for(lambda: all(c["state"] == "idle" for c in h.obs.vendor("GetStatus")["canvases"]), 20)
+    after = h.obs.call("GetStats")
+    skipped = after["renderSkippedFrames"] - before["renderSkippedFrames"]
+    lagged = after["outputSkippedFrames"] - before["outputSkippedFrames"]
+    check("no render frames skipped with two recordings", skipped <= 2, f"{skipped} skipped")
+    check("no encoder frames skipped with two recordings", lagged <= 2, f"{lagged} skipped")
+    for c in during:
+        check(f"{c['canvas']}: no dropped frames", c["dropped_frames"] == 0, c["dropped_frames"])
+        check(f"{c['canvas']}: audio buffering under 250 ms", c["audio_latency_ms"] < 250,
+              f"{c['audio_latency_ms']} ms")
+    print(f"  OBS CPU {after['cpuUsage']:.1f}%, memory {after['memoryUsage']:.0f} MB, "
+          f"average render {after['averageFrameRenderTime']:.2f} ms")
+
+
 def test_disabled(h):
     print("Plugin disabled records everything as live")
     h.obs.vendor("SetEnabled", {"enabled": False})
@@ -354,30 +467,75 @@ def test_disabled(h):
     check("disabled: hidden box not recorded", media.pixel(path, 1.5, 900, 300) == "red")
 
 
+def connect(url):
+    obs = Client(url, timeout=90)
+    wait_for(lambda: len(obs.vendor("GetStatus").get("canvases", [])) > 1, 30)
+    return obs
+
+
+def test_crash_recovery(h, process, url):
+    print("Crash recovery (FR-009)")
+    h.obs.vendor("StartRecording", {"canvas": "main"})
+    wait_for(lambda: h.status("main")["state"] == "recording", 10)
+    path = h.status("main")["file"]
+    time.sleep(4)
+    h.obs.close()
+    process.kill()
+
+    process.start()
+    h.obs = connect(url)
+    found = h.obs.vendor("GetInterruptedRecordings")["recordings"]
+    paths = [os.path.normcase(os.path.normpath(r["path"])) for r in found]
+    check("interrupted recording reported after a crash", os.path.normcase(os.path.normpath(path)) in paths,
+          f"{len(found)} reported")
+    duration = float(media.probe(path)["format"].get("duration", 0))
+    check("interrupted MKV is playable", duration > 2.0, f"{duration:.1f}s")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default="ws://127.0.0.1:4466")
     parser.add_argument("--workdir", required=True)
+    parser.add_argument("--obs-dir", required=True)
     args = parser.parse_args()
     os.makedirs(args.workdir, exist_ok=True)
 
-    obs = Client(args.url)
-    h = Harness(obs, args.workdir)
-    wait_for(lambda: len(obs.vendor("GetStatus").get("canvases", [])) > 0, 30)
+    process = ObsProcess(args.obs_dir)
+    process.start()
+    h = Harness(connect(args.url), args.workdir)
 
     tests = [test_discovery, setup, test_main_recording, test_warnings, test_vertical,
-             test_failure_isolation, test_pause, test_groups, test_av_sync, test_disabled]
+             test_failure_isolation, test_pause, test_groups, test_studio_mode, test_transition_blend,
+             test_source_removed, test_hotkey, test_av_sync, test_performance, test_disabled,
+             test_collection_switch]
     for test in tests:
         try:
             test(h)
         except Exception as e:  # noqa: BLE001 - report and keep going
             check(f"{test.__name__} ran without errors", False, repr(e))
 
+    try:
+        test_crash_recovery(h, process, args.url)
+    except Exception as e:  # noqa: BLE001
+        check("test_crash_recovery ran without errors", False, repr(e))
+
+    print("Clean shutdown")
+    h.obs.close()
+    closed = process.close()
+    check("OBS exits cleanly", closed)
+    log = process.latest_log()
+    with open(log, encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    leaks = [line for line in text.splitlines() if "Number of memory leaks" in line]
+    check("no memory leaks at shutdown", leaks and leaks[-1].strip().endswith(": 0"),
+          leaks[-1].strip() if leaks else "no leak line")
+    check("plugin unloaded", "[obs-selective-recording] unloaded" in text)
+    print(f"  log: {log}")
+
     failed = [name for name, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")
     for name in failed:
         print(f"  FAILED: {name}")
-    obs.close()
     return 1 if failed else 0
 
 

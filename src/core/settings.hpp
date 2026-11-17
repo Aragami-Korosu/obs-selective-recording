@@ -54,6 +54,7 @@ public:
 
 	bool enabled = true;
 	bool offer_recovery = true;
+	bool dock_introduced = false;
 	RecordingDefaults recording;
 	WarningSettings warnings;
 

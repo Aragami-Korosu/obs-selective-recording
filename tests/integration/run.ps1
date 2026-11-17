@@ -5,7 +5,7 @@
 #
 # -Obs     A copy of OBS Studio (31.1 or newer) with portable_mode.txt and Aitum Vertical installed.
 # -Plugin  The packaged plugin folder (contains bin\64bit and data).
-# -Python  A Python with websocket-client, numpy and pillow.
+# -Python  A Python with websocket-client, numpy and pillow. ffmpeg and ffprobe must be on PATH.
 param(
 	[Parameter(Mandatory)] [string] $Obs,
 	[Parameter(Mandatory)] [string] $Plugin,
@@ -15,24 +15,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $config = Join-Path $Obs "config\obs-studio"
-$pidFile = Join-Path $WorkDir "obs.pid"
 New-Item -ItemType Directory -Force $WorkDir | Out-Null
 
-function Stop-TestObs {
-	if (Test-Path $pidFile) {
-		$id = [int](Get-Content $pidFile)
-		$proc = Get-Process -Id $id -ErrorAction SilentlyContinue
-		if ($proc -and $proc.Path -like "$Obs*") {
-			$proc.CloseMainWindow() | Out-Null
-			if (-not $proc.WaitForExit(15000)) { Stop-Process -Id $id -Force }
-		}
-		Remove-Item $pidFile -Force
-	}
-}
-
-Stop-TestObs
-
-# Fresh scene collection every run.
+# Fresh scene collection and plugin settings every run.
 Remove-Item (Join-Path $config "basic\scenes\*") -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $config "plugin_config\obs-selective-recording") -Recurse -Force -ErrorAction SilentlyContinue
 & $Python (Join-Path $PSScriptRoot "fixture.py") --config $config
@@ -43,18 +28,5 @@ $data = Join-Path $Obs "data\obs-plugins\obs-selective-recording"
 New-Item -ItemType Directory -Force $data | Out-Null
 Copy-Item (Join-Path $Plugin "data\*") $data -Recurse -Force
 
-$bin = Join-Path $Obs "bin\64bit"
-$proc = Start-Process -FilePath (Join-Path $bin "obs64.exe") -WorkingDirectory $bin -PassThru `
-	-ArgumentList '--portable', '--multi', '--disable-shutdown-check', '--disable-updater', '--minimize-to-tray'
-Set-Content $pidFile $proc.Id
-
-try {
-	& $Python (Join-Path $PSScriptRoot "run_tests.py") --workdir $WorkDir
-	$code = $LASTEXITCODE
-} finally {
-	Stop-TestObs
-}
-
-$log = Get-ChildItem (Join-Path $config "logs") -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-Write-Host "OBS log: $($log.FullName)"
-exit $code
+& $Python (Join-Path $PSScriptRoot "run_tests.py") --workdir $WorkDir --obs-dir $Obs
+exit $LASTEXITCODE

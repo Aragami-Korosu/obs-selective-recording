@@ -281,6 +281,22 @@ void get_warnings(obs_data_t *request, obs_data_t *response, void *)
 	});
 }
 
+void get_interrupted(obs_data_t *request, obs_data_t *response, void *)
+{
+	on_ui(request, response, [](Controller &c, obs_data_t *, obs_data_t *res) {
+		OBSDataArrayAutoRelease list = obs_data_array_create();
+		for (const auto &rec : c.interrupted()) {
+			OBSDataAutoRelease entry = obs_data_create();
+			obs_data_set_string(entry, "id", rec.id.c_str());
+			obs_data_set_string(entry, "canvas", rec.canvas.c_str());
+			obs_data_set_string(entry, "path", rec.path.c_str());
+			obs_data_set_string(entry, "started", rec.started.c_str());
+			obs_data_array_push_back(list, entry);
+		}
+		obs_data_set_array(res, "recordings", list);
+	});
+}
+
 struct Request {
 	const char *name;
 	obs_websocket_request_callback_function fn;
@@ -295,6 +311,7 @@ const Request kRequests[] = {
 	{"SetEnabled", set_enabled},
 	{"SetCanvasSettings", set_canvas_settings},
 	{"GetCanvasScenes", get_canvas_scenes},
+	{"GetInterruptedRecordings", get_interrupted},
 	{"SetRoute", set_route},
 	{"GetRoute", get_routes},
 	{"GetWarnings", get_warnings},

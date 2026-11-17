@@ -38,15 +38,20 @@ def has_audio(info):
     return any(s["codec_type"] == "audio" for s in info["streams"])
 
 
-def pixel(path, seconds, x, y):
-    """Colour name of the pixel at (x, y) at a time in the recording."""
+def pixel_rgb(path, seconds, x, y):
+    """RGB of the pixel at (x, y) at a time in the recording."""
     raw = subprocess.run(
         ["ffmpeg", "-v", "error", "-ss", f"{seconds:.3f}", "-i", path,
          "-vf", f"crop=2:2:{x}:{y}", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
         check=True, capture_output=True).stdout
     if len(raw) < 3:
         raise RuntimeError(f"no frame at {seconds}s in {path}")
-    return nearest_color(tuple(raw[:3]))
+    return tuple(raw[:3])
+
+
+def pixel(path, seconds, x, y):
+    """Colour name of the pixel at (x, y) at a time in the recording."""
+    return nearest_color(pixel_rgb(path, seconds, x, y))
 
 
 def tone_levels(path, freqs, start=0.5, duration=2.0):
