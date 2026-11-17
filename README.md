@@ -7,20 +7,22 @@ Choose which sources go to your **stream**, which go to your **recording**, and 
 
 ## What it does
 
-Most streamers want their recording to differ slightly from their live output. You might drop alerts and chat overlays from a YouTube upload, or keep copyrighted music off the VOD while your stream still hears it. OBS Selective Recording adds a dock where you set a route for each source:
+Most streamers want their recording to differ slightly from their live output. You might drop alerts and chat overlays from a YouTube upload, or keep copyrighted music off the VOD while your stream still hears it. OBS Selective Recording adds a dock where you choose what goes into the recording for each source:
 
-| Route | Stream | Recording |
-| --- | :---: | :---: |
-| **Both** | ✅ | ✅ |
-| **Stream only** | ✅ | — |
-| **Recording only** | — | ✅ |
-| **Off** | — | — |
+| Route | In the recording | Your stream |
+| --- | :---: | --- |
+| **Both** | ✅ | Unchanged |
+| **Stream only** | — | Unchanged |
+| **Recording only** | ✅ | Hide it in OBS. The plugin warns you if it's still live. |
+| **Off** | — | Hide it in OBS. The plugin warns you if it's still live. |
 
-You set video and audio routes separately. For example, your game capture can appear in both outputs while its audio goes only to the recording.
+You set video and audio routes separately. For example, your game capture can appear in the recording while its audio is left out.
+
+> **Your stream is never touched.** The plugin only controls its own recordings. It never hides, mutes or changes anything in your live scenes, your stream, or other plugins' outputs. That way, a recording problem can't change what your viewers see.
 
 ### Works with dual output
 
-Streamlabs turns off Selective Recording when Dual Output is enabled. This plugin is designed for that setup. With [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas), you get a separate selective recording for the **horizontal** and the **vertical** canvas. You can run either one, or both at once, while both streams stay live.
+Streamlabs turns off Selective Recording when Dual Output is enabled. This plugin is designed for that setup. With [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas), you get a separate selective recording for the **horizontal** and the **vertical** canvas. You can run either one, or both at once, while both streams stay live. If one recording fails, the other keeps going.
 
 ## Planned features
 
@@ -31,6 +33,7 @@ Streamlabs turns off Selective Recording when Dual Output is enabled. This plugi
 - Independent recording settings: encoder, resolution, frame rate, bitrate and container.
 - A live preview of the recording composition.
 - Routing profiles, hotkeys and settings that persist across restarts.
+- Recovery: interrupted recordings stay playable and are flagged the next time OBS starts.
 - No external services, accounts or Streamlabs dependency.
 
 See the [specification](docs/SPECIFICATION.md) for the full requirements.

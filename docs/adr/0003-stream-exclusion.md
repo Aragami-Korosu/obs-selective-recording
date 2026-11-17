@@ -1,41 +1,57 @@
-# 0003. How `recording_only` removes a source from the stream
+# 0003. Preserve the live composition; stream exclusion is user-managed
 
-- **Status:** Proposed. Needs a decision before Phase 2 is complete.
+- **Status:** Accepted
 - **Date:** 2026-11-17
 
 ## Context
 
-The specification has two requirements that pull against each other:
+The routing model lets users mark a source as **Recording only** or **Off**. Both imply the source should not be in the stream. But the stream renders OBS's canvases and mixes audio from OBS's tracks, and the plugin owns none of them. Keeping a source out of the stream therefore means changing OBS state that viewers see.
 
-- `recording_only` and `off` must keep a source **out of the stream**.
-- The plugin must not modify the live scene, and it must keep the normal OBS streaming workflow intact.
+We considered three options:
 
-The stream renders OBS's main canvas and mixes audio from OBS's tracks. The plugin owns neither. So a source can only be excluded from the stream if something in OBS's own state changes.
-
-## Options
-
-**A. The plugin manages stream exclusion (recommended).**
-For video, the plugin hides the original scene item. For audio, it removes the source from the tracks used by the stream. The plugin records every change it makes, re-applies it as needed, and reverts it when the plugin is disabled or the route changes. The private mirror ignores the original's visibility for these items.
-
-- ✅ Matches what users expect from "recording only". There's one control and it just works.
-- ⚠️ The plugin changes OBS state. This must be reversible, and the dock must show it clearly.
-- ⚠️ The plugin has to deal with users toggling the same item by hand.
-
-**B. The user manages stream exclusion.**
-The user hides the source in OBS. The mirror shows it in the recording anyway, and the dock warns the user when OBS state doesn't match the route.
-
-- ✅ The plugin never writes to OBS state.
-- ❌ Each route takes two steps, and it's easy to get wrong.
-
-**C. Replace the stream output.**
-Render a second private composition just for the stream.
-
-- ❌ Doubles the rendering cost and takes over OBS's core streaming path. Out of scope.
-
-## Multiple canvases
-
-With Vertical Canvas ([ADR-0005](0005-multi-canvas-support.md)), excluding video is still done per canvas, because each canvas has its own scene items. Audio is different: OBS mixer tracks are shared by every canvas. If the horizontal and vertical streams use the same track, removing a source from that track removes it from both streams. Under option A, the dock has to detect this and say so. The workaround is to give each stream its own track.
+- **A. Plugin-managed exclusion.** The plugin hides the original scene items and removes sources from the stream's audio tracks.
+- **B. User-managed exclusion.** The plugin controls only its own recordings. The user hides sources from the stream in OBS, and the plugin warns when what OBS is doing doesn't match the user's intent.
+- **C. Replace the stream output** with a plugin-rendered composition.
 
 ## Decision
 
-Pending. Option A is recommended.
+**Option B.** The plugin never modifies the live composition of any canvas.
+
+The plugin controls only what goes into its own recordings. It must never:
+
+- Hide, show, reorder, transform or remove scene items in any original scene, on any canvas.
+- Change a source's audio mixer tracks, volume, mute, monitoring or filters.
+- Create, modify, start or stop any output it didn't create. That includes OBS's stream, recording, replay buffer and virtual camera, and the stream, recording and replay buffer of Aitum Vertical or any other plugin.
+- Rename, reconfigure or remove a canvas it didn't create.
+
+This applies to every canvas, including the main canvas and Aitum Vertical.
+
+### What each route means
+
+The route tells the plugin two things: whether the source goes into the recording, and what the user *intends* for the stream. The plugin acts only on the first. It uses the second only to decide when to warn.
+
+| Route | Recording (plugin-controlled) | Stream (user-controlled in OBS) | Warning when |
+| --- | --- | --- | --- |
+| **Both** | Included | Unchanged | Never |
+| **Stream only** | Excluded | Unchanged | Never |
+| **Recording only** | Included | User should hide it | It's still live on that canvas |
+| **Off** | Excluded | User should hide it | It's still live on that canvas |
+
+"Live on a canvas" means:
+
+- **Video:** the source has a visible scene item, either directly or through a visible group or nested scene, in a scene on that canvas that is on air.
+- **Audio:** the source is enabled on at least one mixer track that feeds an active or configured stream output for that canvas, and it isn't muted.
+
+The plugin reads this state but never changes it.
+
+### Wording
+
+The interface and documentation must never say that the plugin removes a source from the stream. Each route must be described by its effect on the recording. Where a route implies the user should hide the source from the stream, the interface must say that's done in OBS.
+
+## Consequences
+
+- Enabling, disabling or misconfiguring the plugin can't change what viewers see. A recording failure can't affect the broadcast through anything this plugin owns.
+- Aitum Vertical and other plugins keep full control of their canvases and outputs.
+- **Recording only** and **Off** take two steps: set the route in the dock, then hide the source in OBS. The warning system ([SPECIFICATION](../SPECIFICATION.md), NFR-008) makes it hard to miss the second step.
+- **Shared audio tracks** limit the stream, not the recording. The recording audio mix is built from each source directly ([ADR-0004](0004-independent-audio-mix.md)), so it never depends on OBS's tracks. If two streams share a track, the user can't remove a source's audio from one stream without removing it from the other. That's a limit of OBS's track setup, not of selective recording. The plugin detects it and explains it (NFR-006).
+- The warning checks need read-only access to scene item visibility, mixer flags, and each stream output's audio encoders. This is in scope for Phase 1 (inventory) and Phase 6 (dock warnings).

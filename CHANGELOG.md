@@ -14,3 +14,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Project documentation: specification, architecture, roadmap, configuration schema, build guide and decision records.
 - Multi-canvas design for dual output with Aitum Vertical Canvas 1.6.0+ (ADR-0005).
 - Logging of every detected canvas (main, Aitum Vertical and others) on load and whenever canvases change.
+- ADR-0003 accepted: the plugin never modifies a live composition, and keeping a source out of a stream is done by the user in OBS.
+- Non-functional requirements NFR-001 to NFR-010 (stream protection, failure handling per canvas, warnings, runtime canvas changes) and recovery requirements (FR-009).

@@ -4,17 +4,17 @@
 
 ## 1. Product vision
 
-OBS Selective Recording is a native OBS Studio plugin that lets users choose, independently, which video and audio sources go to their livestream and which go to their local recording.
+OBS Selective Recording is a native OBS Studio plugin that records a composition that differs from your livestream. You choose, per source and separately for video and audio, what goes into the recording. The livestream is left exactly as you built it in OBS.
 
 The plugin must:
 
 - Run entirely inside OBS Studio, with no external services.
 - Provide a dedicated, dockable management interface.
-- Route video and audio independently for every supported source.
-- Record a composition that differs from the live stream **without modifying the live scene**.
+- Route video and audio into the recording independently for every supported source.
+- **Never modify the live composition of any canvas.** It controls only its own recordings ([ADR-0003](adr/0003-stream-exclusion.md)).
 - Stay in sync with the active scene collection.
 - Keep routing configuration across OBS restarts.
-- Work with dual-output setups (horizontal and vertical). Each canvas gets its own selective recording. See [section 3.5](#35-multiple-canvases-dual-output).
+- Work with dual-output setups (horizontal and vertical). Each canvas gets its own selective recording ([section 3.5](#35-multiple-canvases-dual-output)).
 
 | Identifier | Value |
 | --- | --- |
@@ -24,14 +24,14 @@ The plugin must:
 
 ## 2. Routing model
 
-Each source has a **video route** and an **audio route**, and each can take one of these values:
+Each source has a **video route** and an **audio route**. The plugin controls only the **Recording** column. The **Stream** column describes what the user intends, and the user sets that in OBS. The plugin uses it only to decide when to warn.
 
-| Route | Config value | Stream | Recording |
-| --- | --- | :---: | :---: |
-| Both | `both` | Included | Included |
-| Stream only | `stream_only` | Included | Excluded |
-| Recording only | `recording_only` | Excluded | Included |
-| Off | `off` | Excluded | Excluded |
+| Route | Config value | Recording (plugin) | Stream (user, in OBS) |
+| --- | --- | :---: | --- |
+| Both | `both` | Included | Unchanged |
+| Stream only | `stream_only` | Excluded | Unchanged |
+| Recording only | `recording_only` | Included | User hides it. The plugin warns if it's still live. |
+| Off | `off` | Excluded | User hides it. The plugin warns if it's still live. |
 
 Rules:
 
@@ -43,21 +43,22 @@ Rules:
   4. Group or nested-scene inheritance
   5. Profile default
   6. Built-in default (`both`)
-- **Stream exclusion** (`recording_only` and `off`) must remove the source from OBS's main output, which the plugin doesn't own. How it does this is an open decision, tracked in [ADR-0003](adr/0003-stream-exclusion.md).
-- **Disabling the plugin** returns the recording to the default all-included composition. It must never produce a blank or partial recording.
+- The interface and documentation must never say that the plugin removes a source from a stream.
+- **Disabling the plugin** returns every recording to the default all-included composition. It must never produce a blank or partial recording.
 
 ## 3. Functional requirements
 
 | ID | System | Responsibility |
 | --- | --- | --- |
-| FR-001 | Source Manager | Discover and track OBS sources, scenes, groups and audio sources |
+| FR-001 | Source Manager | Discover and track canvases, sources, scenes, groups and audio sources |
 | FR-002 | Video Router | Decide recording visibility for each source |
 | FR-003 | Audio Router | Route each audio source into the recording mix |
 | FR-004 | Scene Synchroniser | Mirror scene changes, edits and transitions |
-| FR-005 | Recording Engine | Run an independent encoder and output pipeline |
+| FR-005 | Recording Engine | Run an independent encoder and output pipeline for each canvas |
 | FR-006 | Preview Engine | Display the recording composition |
 | FR-007 | Configuration Manager | Save, restore and migrate settings |
-| FR-008 | Control Interface | Provide the dock, hotkeys and controls |
+| FR-008 | Control Interface | Provide the dock, hotkeys, controls and warnings |
+| FR-009 | Recovery | Detect interrupted recordings and help recover them |
 
 ### 3.1 Video
 
@@ -78,6 +79,16 @@ It must also:
 
 ### 3.2 Audio
 
+The plugin keeps three things separate:
+
+| Layer | Owner | Plugin access |
+| --- | --- | --- |
+| Audio sources (mic, game, Discord…) | OBS | Read-only capture of each source's audio |
+| OBS mixer tracks 1–6, which feed streams and OBS recordings | OBS and the user | Read-only, used only for warnings |
+| Recording audio mix | Plugin | Full control |
+
+The recording mix is built directly from each source ([ADR-0004](adr/0004-independent-audio-mix.md)). It never reads from or changes OBS's tracks, so the track setup doesn't limit what can be recorded. Track layout only matters for keeping audio *out of a stream*, which the user does in OBS.
+
 | Feature | v1.0 |
 | --- | --- |
 | Independent per-source routing | Required |
@@ -91,7 +102,7 @@ It must also:
 | Monitoring the recording mix | Optional |
 | Separate tracks (stems) per source | Post-1.0 |
 
-The plugin needs to match OBS mixer behaviour, including volume, balance, sync offset, push-to-talk and audio filters. The first audio proof of concept will establish how closely it can do this.
+The plugin needs to match OBS mixer behaviour, including volume, balance, sync offset, push-to-talk and audio filters. POC 2 will establish how closely it can do this, before anything is declared impossible.
 
 ### 3.3 Recording
 
@@ -117,8 +128,14 @@ The recording must start and stop without affecting streaming, and it must be in
 - Search, filtering and bulk changes.
 - Icons for each source type, plus warnings for unsupported sources.
 
+**Warnings**
+- A **Recording only** or **Off** source that's still live on that canvas (NFR-008). The warning names the scene or audio track responsible.
+- Audio setups the user can't achieve, for example two streams sharing a track (NFR-006).
+- Not enough encoder capacity to start (NFR-007).
+- An interrupted recording found at startup (FR-009).
+
 **Recording controls**
-- Start, pause and stop.
+- Start, pause and stop for each canvas.
 - Duration, file name, file size, dropped frames, encoder status and low-disk-space warnings.
 
 **Preview**
@@ -143,9 +160,12 @@ Streamlabs Desktop disables Selective Recording when Dual Output is on. This plu
 | A separate selective recording for each canvas, which can be started separately or together | Required |
 | Recording resolution follows the canvas by default (for example 1080×1920 vertical) | Required |
 | Follow scene switches, transitions and per-scene transition overrides on each canvas | Required |
-| Source rules shared across canvases, with per-canvas overrides | Required |
 | Never modify, start or stop another plugin's canvas or outputs | Required |
 | Other canvases that follow the same conventions (for example Twitch Dual Format) | Best effort |
+
+**Shared across canvases** (profile level): source routing rules, audio routing rules, global recording preferences (container, audio encoder and bitrate, filename format, recovery options), and profile management.
+
+**Specific to each canvas:** source overrides, enabling the canvas, recording resolution, video encoder and quality, recording destination, and the recording controls.
 
 In the dock, each canvas has its own tab (for example **Horizontal** and **Vertical**). Each tab has its own source list and recording controls.
 
@@ -155,10 +175,40 @@ See [ADR-0005](adr/0005-multi-canvas-support.md).
 
 Routing must survive OBS restarts, scene and scene-collection changes, source renames and reordering, and profile changes. Sources are identified by UUID, never by name. See [CONFIGURATION.md](CONFIGURATION.md).
 
-## 4. Out of scope for v1.0
+### 3.7 Recovery
+
+| Situation | Required behaviour |
+| --- | --- |
+| Encoder or output error while recording | Stop that canvas's recording, finalise what's been written, and report the cause. Other canvases and every stream keep running. |
+| Disk full or destination unavailable | Same as above, with a specific message. Warn early when free space is low. |
+| A canvas is removed while recording | Stop that canvas's recording cleanly, and keep the file. |
+| A source is deleted while recording | Remove it from the mirror. The recording continues. |
+| OBS exits normally while recording | Stop and finalise every recording before the plugin unloads. |
+| OBS crashes or the power fails | The file stays playable (MKV, or a crash-resilient MP4 mode if POC 3 confirms one). On the next start, the plugin reports the interrupted recording and offers to remux it. |
+
+The plugin records a session marker for each active recording. It removes the marker when the recording stops cleanly, and checks for leftover markers at startup.
+
+## 4. Non-functional requirements
+
+| ID | Requirement | Verified by |
+| --- | --- | --- |
+| NFR-001 | Never modify the visibility, order, transform or audio track assignment of anything in an original OBS canvas | Code review rule. A test asserts that the original scene state is unchanged after every plugin operation. |
+| NFR-002 | Recording failures must not interrupt streaming | Fault-injection tests (encoder failure, disk full, output error) while streaming |
+| NFR-003 | Each canvas handles its own recording failures. A failure on one canvas never stops another canvas's recording. | Fault injection on one canvas while both are recording |
+| NFR-004 | Routing changes apply to active recordings immediately, and never restart a stream or a recording | Integration test: change routes while streaming and recording |
+| NFR-005 | Aitum Vertical keeps working as before: its scenes, transitions, streams, recording, replay buffer and hotkeys | Regression checklist against the latest Vertical release |
+| NFR-006 | Detect and explain audio setups the user can't achieve, for example a **Recording only** source on a track two streams share | Unit tests on the track analysis, plus a dock warning |
+| NFR-007 | Detect encoder capacity limits before starting, and fail with a clear message instead of disturbing other encoders | Start with hardware sessions exhausted |
+| NFR-008 | Warn when a **Recording only** or **Off** source is still live on its canvas, for video or audio | Integration test for each canvas |
+| NFR-009 | Handle canvases being created and removed while OBS is running, including while recording | Add and remove Vertical's canvas at runtime |
+| NFR-010 | Keep settings separately for each canvas. A canvas that's missing keeps its settings until it returns. | Settings round-trip tests |
+
+**Scope of NFR-002 and NFR-003.** The plugin runs inside the OBS process. A crash in plugin code takes OBS down with it, and the stream with it. These requirements cover failures the plugin can catch and handle. Crash risk is reduced by strict reference ownership, never letting C++ exceptions cross into libobs callbacks, defensive checks on every OBS handle, and the long-run tests in Phase 7.
+
+## 5. Out of scope for v1.0
 
 - Separate audio tracks (stems) for each source
-- File splitting and automatic remuxing
+- File splitting and automatic remuxing during recording
 - Linux and macOS builds. The architecture supports them, but they aren't tested yet.
-- Changing the live stream composition
+- Any change to a live composition, by design ([ADR-0003](adr/0003-stream-exclusion.md))
 - Vertical Canvas versions earlier than 1.6.0, whose scenes are private to that plugin
