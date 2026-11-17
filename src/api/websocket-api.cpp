@@ -10,6 +10,7 @@
 #include <obs-websocket-api.h>
 #include <plugin-support.h>
 
+#include <algorithm>
 #include <functional>
 
 namespace selective_recording::websocket {
@@ -209,6 +210,53 @@ void get_routes(obs_data_t *request, obs_data_t *response, void *)
 	});
 }
 
+void set_canvas_settings(obs_data_t *request, obs_data_t *response, void *)
+{
+	on_ui(request, response, [](Controller &c, obs_data_t *req, obs_data_t *res) {
+		const char *canvas = obs_data_get_string(req, "canvas");
+		if (!canvas || !*canvas || !c.pipeline(canvas)) {
+			obs_data_set_string(res, "error", "Unknown canvas.");
+			return;
+		}
+
+		CanvasSettings &cs = c.settings().canvas(canvas);
+		if (obs_data_has_user_value(req, "enabled"))
+			cs.enabled = obs_data_get_bool(req, "enabled");
+		if (obs_data_has_user_value(req, "output_directory"))
+			cs.output_directory = obs_data_get_string(req, "output_directory");
+		if (obs_data_has_user_value(req, "video_encoder"))
+			cs.video_encoder = obs_data_get_string(req, "video_encoder");
+		if (obs_data_has_user_value(req, "width"))
+			cs.width = (uint32_t)obs_data_get_int(req, "width") & ~1u;
+		if (obs_data_has_user_value(req, "height"))
+			cs.height = (uint32_t)obs_data_get_int(req, "height") & ~1u;
+		if (obs_data_has_user_value(req, "fps_divisor"))
+			cs.fps_divisor = (uint32_t)std::max<long long>(1, obs_data_get_int(req, "fps_divisor"));
+		c.settings_changed();
+		obs_data_set_bool(res, "ok", true);
+	});
+}
+
+// Scenes on non-main canvases can't be found by name through obs-websocket, so expose their UUIDs.
+void get_canvas_scenes(obs_data_t *request, obs_data_t *response, void *)
+{
+	on_ui(request, response, [](Controller &c, obs_data_t *req, obs_data_t *res) {
+		Pipeline *p = c.pipeline(obs_data_get_string(req, "canvas"));
+		if (!p) {
+			obs_data_set_string(res, "error", "Unknown canvas.");
+			return;
+		}
+		OBSDataArrayAutoRelease list = obs_data_array_create();
+		for (auto &scene : canvas_scenes(p->canvas())) {
+			OBSDataAutoRelease entry = obs_data_create();
+			obs_data_set_string(entry, "name", obs_source_get_name(scene));
+			obs_data_set_string(entry, "uuid", obs_source_get_uuid(scene));
+			obs_data_array_push_back(list, entry);
+		}
+		obs_data_set_array(res, "scenes", list);
+	});
+}
+
 void get_warnings(obs_data_t *request, obs_data_t *response, void *)
 {
 	on_ui(request, response, [](Controller &c, obs_data_t *, obs_data_t *res) {
@@ -245,6 +293,8 @@ const Request kRequests[] = {
 	{"PauseRecording", pause_recording},
 	{"ResumeRecording", resume_recording},
 	{"SetEnabled", set_enabled},
+	{"SetCanvasSettings", set_canvas_settings},
+	{"GetCanvasScenes", get_canvas_scenes},
 	{"SetRoute", set_route},
 	{"GetRoute", get_routes},
 	{"GetWarnings", get_warnings},
