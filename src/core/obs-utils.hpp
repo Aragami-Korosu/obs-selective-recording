@@ -35,6 +35,10 @@ std::vector<OBSSource> canvas_scenes(obs_canvas_t *canvas);
 std::vector<OBSSource> global_audio_sources();
 
 bool has_audio(obs_source_t *source);
+
+// "Monitor Only" sources are left out of OBS's mix. OBS 33 removed that mode (and logs a
+// deprecation warning on every query), so this only asks older versions.
+bool is_monitor_only(obs_source_t *source);
 bool has_video(obs_source_t *source);
 std::string source_uuid(obs_source_t *source);
 std::string source_name(obs_source_t *source);

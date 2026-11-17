@@ -163,7 +163,7 @@ WarningMap evaluate_warnings(const std::vector<CanvasInfo> &canvases, const Rout
 		for (auto &source : audible) {
 			if (!has_audio(source) || obs_source_muted(source))
 				continue;
-			if (obs_source_get_monitoring_type(source) == OBS_MONITORING_TYPE_MONITOR_ONLY)
+			if (is_monitor_only(source))
 				continue;
 
 			const ResolvedRoute route = routes.resolve_audio(info.key, source);

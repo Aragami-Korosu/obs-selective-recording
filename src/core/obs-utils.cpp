@@ -122,6 +122,13 @@ bool has_audio(obs_source_t *source)
 	return source && (obs_source_get_output_flags(source) & OBS_SOURCE_AUDIO) != 0;
 }
 
+bool is_monitor_only(obs_source_t *source)
+{
+	static const bool legacy_monitoring = obs_get_version() < MAKE_SEMANTIC_VERSION(33, 0, 0);
+	return legacy_monitoring && source &&
+	       obs_source_get_monitoring_type(source) == OBS_MONITORING_TYPE_MONITOR_ONLY;
+}
+
 bool has_video(obs_source_t *source)
 {
 	return source && (obs_source_get_output_flags(source) & OBS_SOURCE_VIDEO) != 0;

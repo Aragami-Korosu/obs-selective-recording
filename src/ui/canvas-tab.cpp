@@ -22,6 +22,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QPointer>
 #include <QPushButton>
 #include <QSet>
 #include <QToolButton>
@@ -455,6 +456,8 @@ void CanvasTab::refresh_state()
 		const QString path = QString::fromStdString(pipeline->file_path());
 		file_->setText(QFileInfo(path).fileName());
 		file_->setToolTip(path);
+	} else if (!file_->toolTip().isEmpty()) {
+		file_->setText(text("State.Saved") + QStringLiteral(" ") + QFileInfo(file_->toolTip()).fileName());
 	}
 	state_->setText(status);
 	state_->setStyleSheet(recording ? QStringLiteral("color: #e05d5d; font-weight: bold;") : QString());
@@ -724,9 +727,12 @@ void CanvasTab::toggle_preview(bool enabled)
 
 void CanvasTab::open_settings()
 {
-	SettingsDialog dialog(controller_, key_, this);
-	dialog.exec();
-	refresh_state();
+	QPointer<CanvasTab> self(this);
+	QPointer<SettingsDialog> dialog = new SettingsDialog(controller_, key_, this);
+	dialog->setAttribute(Qt::WA_DeleteOnClose);
+	dialog->exec();
+	if (self)
+		refresh_state();
 }
 
 void CanvasTab::open_folder()

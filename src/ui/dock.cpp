@@ -176,10 +176,12 @@ void Dock::rebuild_tabs()
 		tabs_->currentWidget() ? QString::fromStdString(static_cast<CanvasTab *>(tabs_->currentWidget())->key())
 				       : QString();
 
+	// deleteLater: a tab may be running a dialog or menu when canvases change (for example on exit).
 	while (tabs_->count() > 0) {
 		QWidget *w = tabs_->widget(0);
 		tabs_->removeTab(0);
-		delete w;
+		w->hide();
+		w->deleteLater();
 	}
 
 	for (Pipeline *p : controller_.pipelines()) {

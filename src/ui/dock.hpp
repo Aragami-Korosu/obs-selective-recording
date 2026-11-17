@@ -26,6 +26,8 @@ class Dock : public QWidget {
 public:
 	explicit Dock(Controller &controller, QWidget *parent = nullptr);
 
+	QSize sizeHint() const override { return {460, 680}; }
+
 private:
 	void rebuild_tabs();
 	void refresh_profiles();

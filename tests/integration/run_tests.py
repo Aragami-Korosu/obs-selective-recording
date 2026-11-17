@@ -500,6 +500,26 @@ def test_crash_recovery(h, process, url):
     check("interrupted MKV is playable", duration > 2.0, f"{duration:.1f}s")
 
 
+def shutdown_checks(h, process, label):
+    print(f"Clean shutdown ({label})")
+    try:
+        h.obs.close()
+    except Exception:  # noqa: BLE001
+        pass
+    closed = process.close()
+    check(f"OBS exits cleanly ({label})", closed)
+    log = process.latest_log()
+    with open(log, encoding="utf-8", errors="replace") as f:
+        text = f.read()
+    leaks = [line for line in text.splitlines() if "Number of memory leaks" in line]
+    check(f"no memory leaks ({label})", leaks and leaks[-1].strip().endswith(": 0"),
+          leaks[-1].strip() if leaks else "no leak line")
+    check(f"plugin unloaded ({label})", "[obs-selective-recording] unloaded" in text)
+    deprecated = text.count("is deprecated")
+    check(f"no deprecation warnings caused ({label})", deprecated == 0, f"{deprecated} lines")
+    print(f"  log: {log}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default="ws://127.0.0.1:4466")
@@ -522,23 +542,29 @@ def main():
         except Exception as e:  # noqa: BLE001 - report and keep going
             check(f"{test.__name__} ran without errors", False, repr(e))
 
+    print("Closing OBS while both canvases record")
+    files = []
     try:
+        h.obs.vendor("StartRecording")
+        wait_for(lambda: all(c["state"] == "recording" for c in h.obs.vendor("GetStatus")["canvases"]), 10)
+        files = [c["file"] for c in h.obs.vendor("GetStatus")["canvases"]]
+        time.sleep(3)
+    except Exception as e:  # noqa: BLE001
+        check("recordings started before exit", False, repr(e))
+    shutdown_checks(h, process, "full session")
+    for path in files:
+        duration = float(media.probe(path)["format"].get("duration", 0))
+        check(f"finalised on exit: {os.path.basename(path)}", duration > 2.0, f"{duration:.1f}s")
+
+    try:
+        process.start()
+        h.obs = connect(args.url)
+        leftover = h.obs.vendor("GetInterruptedRecordings")["recordings"]
+        check("clean exit leaves nothing marked interrupted", not leftover, f"{len(leftover)} reported")
         test_crash_recovery(h, process, args.url)
     except Exception as e:  # noqa: BLE001
         check("test_crash_recovery ran without errors", False, repr(e))
-
-    print("Clean shutdown")
-    h.obs.close()
-    closed = process.close()
-    check("OBS exits cleanly", closed)
-    log = process.latest_log()
-    with open(log, encoding="utf-8", errors="replace") as f:
-        text = f.read()
-    leaks = [line for line in text.splitlines() if "Number of memory leaks" in line]
-    check("no memory leaks at shutdown", leaks and leaks[-1].strip().endswith(": 0"),
-          leaks[-1].strip() if leaks else "no leak line")
-    check("plugin unloaded", "[obs-selective-recording] unloaded" in text)
-    print(f"  log: {log}")
+    shutdown_checks(h, process, "after crash recovery")
 
     failed = [name for name, ok in results if not ok]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")

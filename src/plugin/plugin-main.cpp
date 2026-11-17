@@ -34,6 +34,8 @@ void introduce_dock()
 
 	if (auto *dock_widget = qobject_cast<QDockWidget *>(g_dock->parentWidget())) {
 		dock_widget->setVisible(true);
+		if (dock_widget->isFloating())
+			dock_widget->resize(g_dock->sizeHint());
 		dock_widget->raise();
 	}
 	controller->settings().dock_introduced = true;

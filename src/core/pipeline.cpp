@@ -164,13 +164,12 @@ void Pipeline::update_audio_inputs()
 		input.source = source;
 
 		if (!enabled) {
-			input.include = obs_source_get_monitoring_type(source) != OBS_MONITORING_TYPE_MONITOR_ONLY;
+			input.include = !is_monitor_only(source);
 		} else {
 			const ResolvedRoute route = controller_.routes().resolve_audio(key_, source);
 			input.include = in_recording(route.route);
 			// Monitor-only sources are left out of OBS's mix, so they stay out unless asked for.
-			if (route.origin == RouteOrigin::ProfileDefault &&
-			    obs_source_get_monitoring_type(source) == OBS_MONITORING_TYPE_MONITOR_ONLY)
+			if (route.origin == RouteOrigin::ProfileDefault && is_monitor_only(source))
 				input.include = false;
 			input.gain = (float)std::pow(10.0, controller_.routes().gain_db(key_, source) / 20.0);
 		}
