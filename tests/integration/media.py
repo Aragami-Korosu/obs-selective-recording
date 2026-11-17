@@ -69,6 +69,63 @@ def tone_levels(path, freqs, start=0.5, duration=2.0):
     return levels
 
 
+def make_sync_clip(path, seconds=20):
+    """Black video that flashes white for one frame each second, with a 3 kHz beep at the same instant."""
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y",
+         "-f", "lavfi", "-i", f"color=c=black:s=320x180:r=30:d={seconds}",
+         "-f", "lavfi", "-i",
+         f"aevalsrc='if(lt(mod(t,1),0.05),0.5*sin(2*PI*3000*t),0)':s=48000:d={seconds}",
+         "-vf", "geq=lum='if(lt(mod(T,1),0.03),235,16)':cb=128:cr=128",
+         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", path],
+        check=True)
+
+
+def flash_times(path, x, y, w, h, fps=30.0):
+    """Times of frames where a region turns bright."""
+    raw = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", path, "-vf", f"crop={w}:{h}:{x}:{y},scale=1:1,format=gray",
+         "-f", "rawvideo", "-"],
+        check=True, capture_output=True).stdout
+    values = np.frombuffer(raw, dtype=np.uint8)
+    times = []
+    for i in range(1, values.size):
+        if values[i] > 128 and values[i - 1] <= 128:
+            times.append(i / fps)
+    return times
+
+
+def beep_times(path):
+    """Onset times of 3 kHz beeps."""
+    raw = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "48000",
+         "-af", "highpass=f=2500,highpass=f=2500", "-f", "f32le", "-"],
+        check=True, capture_output=True).stdout
+    samples = np.abs(np.frombuffer(raw, dtype=np.float32))
+    window = 96  # 2 ms
+    envelope = np.convolve(samples, np.ones(window) / window, mode="same")
+    threshold = envelope.max() * 0.3
+    onsets = []
+    above = False
+    for i in range(0, envelope.size, 24):
+        if envelope[i] > threshold and not above:
+            onsets.append(i / 48000)
+            above = True
+        elif envelope[i] < threshold * 0.5:
+            above = False
+    return onsets
+
+
+def sync_offsets(flashes, beeps):
+    """Audio minus video offset for each flash that has a beep within half a second."""
+    offsets = []
+    for f in flashes:
+        nearest = min(beeps, key=lambda b: abs(b - f), default=None)
+        if nearest is not None and abs(nearest - f) < 0.5:
+            offsets.append(nearest - f)
+    return offsets
+
+
 def make_tone(path, freq, seconds=20):
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",

@@ -398,6 +398,7 @@ void Controller::save_hotkeys()
 		OBSDataArrayAutoRelease array = obs_hotkey_save(all_hotkeys_);
 		OBSDataAutoRelease data = obs_data_create();
 		obs_data_set_array(data, "toggle_all", array);
+		Settings::ensure_config_dir();
 		obs_data_save_json_safe(data, Settings::config_path("hotkeys.json").c_str(), "tmp", "bak");
 	}
 }

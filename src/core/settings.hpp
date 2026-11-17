@@ -61,6 +61,7 @@ public:
 	const std::map<std::string, CanvasSettings> &canvases() const { return canvases_; }
 
 	static std::string config_path(const char *file);
+	static void ensure_config_dir();
 
 private:
 	std::map<std::string, CanvasSettings> canvases_;

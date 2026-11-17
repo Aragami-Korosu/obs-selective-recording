@@ -135,8 +135,8 @@ def setup(h):
     h.add("SR Test A", "SR Inner", 0, 0)
     h.add("SR Test B", "SR BG Magenta", 0, 0)
 
+    # "SR Scratch" stays: removing it would destroy sources that live only there.
     obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
-    obs.call("RemoveScene", {"sceneName": "SR Scratch"}, allow_fail=True)
 
     obs.vendor("SetRoute", {"source_name": "SR Box Green", "video": "stream_only"})
     obs.vendor("SetRoute", {"source_name": "SR Box Blue", "video": "recording_only"})
@@ -278,6 +278,73 @@ def test_pause(h):
     check("paused time left out of the file", 2.5 < duration < 5.0, f"{duration:.2f}s")
 
 
+def test_groups(h):
+    print("Groups")
+    items = h.obs.call("GetSceneItemList", {"sceneName": "SR Group Scene"})["sceneItems"]
+    group = next((i for i in items if i["sourceName"] == "SR G Group"), None)
+    check("fixture group loaded", group and group["isGroup"], [i["sourceName"] for i in items])
+    if not group:
+        return
+
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Group Scene"})
+    h.obs.vendor("SetRoute", {"source_name": "SR G Box2", "video": "stream_only"})
+    time.sleep(1)
+    path = h.record("main", 3)
+    check("group child recorded in place", media.pixel(path, 1.5, 700, 400) == "green",
+          media.pixel(path, 1.5, 700, 400))
+    check("routing applies inside a group", media.pixel(path, 1.5, 1000, 400) == "red",
+          media.pixel(path, 1.5, 1000, 400))
+
+    h.obs.call("SetSceneItemEnabled", {"sceneName": "SR Group Scene", "sceneItemId": group["sceneItemId"],
+                                       "sceneItemEnabled": False})
+    h.obs.vendor("SetRoute", {"source_name": "SR G Group", "video": "recording_only"})
+    time.sleep(1)
+    path = h.record("main", 3)
+    check("hidden recording-only group recorded", media.pixel(path, 1.5, 700, 400) == "green",
+          media.pixel(path, 1.5, 700, 400))
+    check("live: hidden group stays hidden", h.live_color("SR Group Scene", 700, 400) == "red")
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+
+
+def test_av_sync(h):
+    print("Audio/video sync against OBS's own recording")
+    clip = os.path.join(h.workdir, "sync.mp4")
+    media.make_sync_clip(clip)
+    h.obs.call("CreateScene", {"sceneName": "SR Sync"}, allow_fail=True)
+    h.obs.call("CreateInput", {
+        "sceneName": "SR Sync", "inputName": "SR Sync Clip", "inputKind": "ffmpeg_source",
+        "inputSettings": {"local_file": clip, "looping": True, "is_local_file": True}, "sceneItemEnabled": True})
+    item = h.obs.call("GetSceneItemId", {"sceneName": "SR Sync", "sourceName": "SR Sync Clip"})["sceneItemId"]
+    h.obs.call("SetSceneItemTransform", {"sceneName": "SR Sync", "sceneItemId": item,
+                                         "sceneItemTransform": {"positionX": 1600, "positionY": 900}})
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Sync"})
+    time.sleep(2)
+
+    reference = {}
+
+    def start_obs_recording(start):
+        h.obs.call("StartRecord")
+        time.sleep(7)
+        reference["path"] = h.obs.call("StopRecord")["outputPath"]
+
+    path = h.record("main", 8, during=start_obs_recording)
+    time.sleep(2)
+
+    ours = media.sync_offsets(media.flash_times(path, 1600, 900, 320, 180), media.beep_times(path))
+    theirs = media.sync_offsets(media.flash_times(reference["path"], 1600, 900, 320, 180),
+                                media.beep_times(reference["path"]))
+    check("sync markers found in our recording", len(ours) >= 4, f"{len(ours)} markers")
+    check("sync markers found in OBS's recording", len(theirs) >= 4, f"{len(theirs)} markers")
+    if ours and theirs:
+        ours_ms = 1000 * sorted(ours)[len(ours) // 2]
+        theirs_ms = 1000 * sorted(theirs)[len(theirs) // 2]
+        check("A/V offset matches OBS within one frame", abs(ours_ms - theirs_ms) <= 34,
+              f"ours {ours_ms:+.0f} ms, OBS {theirs_ms:+.0f} ms")
+        spread = 1000 * (max(ours) - min(ours))
+        check("A/V offset is stable (no drift)", spread <= 34, f"spread {spread:.0f} ms")
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+
+
 def test_disabled(h):
     print("Plugin disabled records everything as live")
     h.obs.vendor("SetEnabled", {"enabled": False})
@@ -299,7 +366,7 @@ def main():
     wait_for(lambda: len(obs.vendor("GetStatus").get("canvases", [])) > 0, 30)
 
     tests = [test_discovery, setup, test_main_recording, test_warnings, test_vertical,
-             test_failure_isolation, test_pause, test_disabled]
+             test_failure_isolation, test_pause, test_groups, test_av_sync, test_disabled]
     for test in tests:
         try:
             test(h)

@@ -45,6 +45,11 @@ std::string Settings::config_path(const char *file)
 	return result;
 }
 
+void Settings::ensure_config_dir()
+{
+	os_mkdirs(config_path("").c_str());
+}
+
 CanvasSettings &Settings::canvas(const std::string &key)
 {
 	return canvases_[key];
@@ -147,8 +152,7 @@ void Settings::save() const
 	}
 	obs_data_set_obj(data, "canvases", canvases);
 
-	const std::string dir = config_path("");
-	os_mkdirs(dir.c_str());
+	ensure_config_dir();
 	const std::string path = config_path("settings.json");
 	if (!obs_data_save_json_safe(data, path.c_str(), "tmp", "bak"))
 		obs_log(LOG_WARNING, "could not save settings to %s", path.c_str());
