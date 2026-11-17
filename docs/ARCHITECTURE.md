@@ -164,6 +164,15 @@ Encoder presets:
 | NVENC | CQP, p5 | CBR |
 | AMF, QuickSync | CQP | CBR |
 
+## Sources-list buttons
+
+`SourceListButtons` adds a button to each row of OBS's own Sources list (`QListView` named `sources`, class `SourceTree`). There's no public API for this. To stay safe:
+- Every 400 ms, and after every scene change, it rebuilds the list's order using OBS's rule: top item first, with expanded group children under their group.
+- It only touches a row when the row count matches and the row's label shows that source's name.
+- It inserts a `QToolButton` into the row's layout, before the visibility checkbox. OBS recreates rows often, so missing buttons are simply added again.
+- A button stores only the scene UUID and item ID, and resolves the item when clicked.
+- Clicking changes routes only, never OBS state. If OBS's list changes in a future version, the buttons stop appearing and nothing else breaks.
+
 ## Warnings
 
 `evaluate_warnings()` reads OBS state and changes nothing:

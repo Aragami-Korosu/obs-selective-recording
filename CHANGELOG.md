@@ -18,7 +18,8 @@ First release.
 - A fallback to x264 when a hardware encoder can't start.
 - Each canvas handles its own failures, with clear messages. A failure never affects another canvas or a stream.
 - Warnings when a source meant to stay off the stream is still visible live or still on the stream's audio track, including tracks shared between two streams.
-- A dock with a tab for each canvas: search, filters, bulk changes, profiles (with import and export), preview, pause and resume, status, and an open-folder link. It opens on first run.
+- Streamlabs-style buttons on each source in OBS's Sources list, cycling Both, Stream and Recording. They can be turned off.
+- A dock with a tab for each canvas. The simple view (the default) shows the current scene with one button per source. The Advanced view has separate video and audio controls, per-canvas and per-placement routes, search, filters and bulk changes. Also: profiles (with import and export), preview, pause and resume, status, and an open-folder link. The dock opens on first run.
 - Hotkeys for each canvas, plus start/stop all.
 - Crash recovery: interrupted recordings are listed at the next start.
 - An obs-websocket vendor (`selective-recording`) for automation.

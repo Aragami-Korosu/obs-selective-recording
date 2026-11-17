@@ -21,7 +21,8 @@ Streamlabs turns off Selective Recording when Dual Output is on. This plugin is 
 
 ## Features
 
-- A dock with a tab for each canvas, listing every scene and source, with separate video and audio routing
+- A Streamlabs-style button on every source in OBS's own Sources list, plus a simple dock view of the current scene
+- An advanced view with every scene and separate video and audio routing
 - Routes for every canvas, for one canvas only, or for one placement of a source
 - Warnings when a source you meant to keep off the stream is still live, including audio still on the stream's track
 - A recording composition that follows your scenes, nested scenes, groups, transforms, transitions and Studio Mode automatically
@@ -54,9 +55,19 @@ To uninstall, close OBS and delete `C:\ProgramData\obs-studio\plugins\obs-select
 
 ## Quick start
 
-1. In the dock, find your alert or chat overlay and click its **Video** button until it shows **Stream only**. It's now left out of the recording.
-2. To record a source that isn't on stream, set it to **Rec only** and hide it in OBS (the eye icon).
-3. Click **Start recording**, or **Start all recordings** to record every canvas.
+Like Streamlabs, every source in OBS's **Sources** list gets a small button next to its eye icon:
+
+| Button | Meaning |
+| :---: | --- |
+| 🔵🔴 half and half | **Both**: stream and recording |
+| 🔵 blue | **Stream**: left out of the recording |
+| 🔴 red | **Recording**: in the recording only (hide it in OBS to keep it off the stream) |
+
+1. Click the button next to your alerts or chat overlay until it turns **blue**. It's now left out of the recording.
+2. To record a source that isn't on stream, click until it's **red**, then hide it with the eye icon.
+3. In the **Selective Recording** dock, click **Start recording**, or **Start all recordings** to record every canvas.
+
+Right-click a button for **Off** and more. The dock shows the same buttons for the current scene, plus a tab for Aitum Vertical. Its **Advanced** view has separate video and audio controls and per-canvas options.
 
 The [user guide](docs/USER-GUIDE.md) covers everything else.
 

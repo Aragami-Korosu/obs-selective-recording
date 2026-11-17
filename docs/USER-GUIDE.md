@@ -13,6 +13,25 @@ Your stream and your recording don't have to show the same thing. For every sour
 
 Video and audio are set separately. The plugin **never changes your stream**. It records its own copy of your scenes, so anything you want kept *off the stream* still has to be hidden in OBS, and the dock warns you when something you meant to hide is still live.
 
+## Buttons in the Sources list
+
+Each source in OBS's **Sources** list has a round button next to its eye icon:
+
+| Button | Route |
+| :---: | --- |
+| Half blue, half red | **Both** |
+| Blue | **Stream** (left out of the recording) |
+| Red | **Recording** (recording only) |
+| Grey ring | **Off** |
+| White centre | Video and audio are set differently (change them in the dock's Advanced view) |
+
+- **Click** to cycle Both → Stream → Recording. One click sets the source's video and audio together, on every canvas.
+- **Right-click** for Off, to open the dock, or to hide these buttons. You can also turn them off in Settings → Interface.
+
+The buttons only change what goes into the recording. They never change OBS: the eye icon is still how you show or hide things on stream.
+
+> OBS doesn't offer plugins an official way to add buttons to its Sources list, so these attach to it directly. If a future OBS version changes that list, the buttons will simply stop appearing until the plugin is updated. The dock always works.
+
 ## The dock
 
 On first run, the **Selective Recording** dock opens as a floating window. You can attach it to the side of OBS like any other dock. If you close it, reopen it from **Docks → Selective Recording**.
@@ -21,9 +40,13 @@ On first run, the **Selective Recording** dock opens as a floating window. You c
 - **Profile**: switch between saved sets of routes. Use **⋯** to create, duplicate, rename, delete, import or export profiles. Profiles are saved with the scene collection.
 - **Tabs**: one for each canvas. With Aitum Vertical installed, you'll see **Main** and **Aitum Vertical**.
 
-### Setting routes
+### Simple view
 
-Each scene lists its sources, with **Video** and **Audio** buttons:
+By default, each tab shows the **current scene** with the same one-click buttons as the Sources list. On the Main tab, that's the scene selected in OBS (the preview scene in Studio Mode). On the Aitum Vertical tab, it's the vertical scene on air. Right-click a button for Off or to switch to Advanced.
+
+### Advanced view: setting routes
+
+Click **Advanced** to see every scene on the canvas, with separate **Video** and **Audio** buttons:
 
 - **Click** a button to cycle through Both → Stream only → Rec only → Off.
 - **Right-click** for more options:
