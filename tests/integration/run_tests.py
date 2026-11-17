@@ -510,6 +510,8 @@ def shutdown_checks(h, process, label):
         pass
     closed = process.close()
     check(f"OBS exits cleanly ({label})", closed)
+    if not closed and process.latest_crash():
+        print(f"  hang report: {process.latest_crash()}")
     log = process.latest_log()
     with open(log, encoding="utf-8", errors="replace") as f:
         text = f.read()

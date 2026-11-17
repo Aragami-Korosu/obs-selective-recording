@@ -93,6 +93,7 @@ private:
 	int ticks_ = 0;
 	bool loaded_ = false;
 	bool shutting_down_ = false;
+	bool frontend_gone_ = false;
 };
 
 } // namespace selective_recording

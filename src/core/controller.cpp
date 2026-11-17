@@ -125,8 +125,11 @@ Controller::Controller()
 Controller::~Controller()
 {
 	shutdown();
-	obs_frontend_remove_save_callback(frontend_save, this);
-	obs_frontend_remove_event_callback(frontend_event, this);
+	// After EXIT the frontend API is gone and removing callbacks only logs warnings.
+	if (!frontend_gone_) {
+		obs_frontend_remove_save_callback(frontend_save, this);
+		obs_frontend_remove_event_callback(frontend_event, this);
+	}
 }
 
 void Controller::frontend_event(obs_frontend_event event, void *param)
@@ -182,10 +185,13 @@ void Controller::on_frontend_event(obs_frontend_event event)
 		refresh_canvases();
 		break;
 	case OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN:
-	case OBS_FRONTEND_EVENT_EXIT:
 		// OBS clears every scene and source right after SCRIPTING_SHUTDOWN and waits for them
 		// to be released, so recordings and mirrors must let go here, not at EXIT.
 		shutdown();
+		break;
+	case OBS_FRONTEND_EVENT_EXIT:
+		shutdown();
+		frontend_gone_ = true;
 		break;
 	default:
 		break;
@@ -421,6 +427,11 @@ void Controller::shutdown()
 	timer_.stop();
 	save_timer_.stop();
 
+	size_t active = 0;
+	for (auto &[key, p] : pipelines_)
+		active += p->busy() ? 1 : 0;
+	obs_log(LOG_INFO, "shutting down (%zu recording%s active)", active, active == 1 ? "" : "s");
+
 	save_hotkeys();
 	settings_.save();
 
@@ -442,6 +453,7 @@ void Controller::shutdown()
 		all_hotkeys_ = OBS_INVALID_HOTKEY_ID;
 	}
 	emit canvasesChanged();
+	obs_log(LOG_INFO, "shutdown complete");
 }
 
 } // namespace selective_recording

@@ -24,6 +24,7 @@ namespace {
 
 constexpr const char *kDockId = "selective-recording-dock";
 QPointer<Dock> g_dock;
+bool g_frontend_gone = false;
 
 // OBS hides new plugin docks; show ours once so new users can find it.
 void introduce_dock()
@@ -44,10 +45,12 @@ void introduce_dock()
 
 void on_frontend_event(enum obs_frontend_event event, void *)
 {
-	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING)
+	if (event == OBS_FRONTEND_EVENT_FINISHED_LOADING) {
 		introduce_dock();
-	else if (event == OBS_FRONTEND_EVENT_EXIT)
+	} else if (event == OBS_FRONTEND_EVENT_EXIT) {
 		websocket::unregister_vendor();
+		g_frontend_gone = true;
+	}
 }
 
 } // namespace
@@ -90,7 +93,8 @@ void obs_module_post_load(void)
 
 void obs_module_unload(void)
 {
-	obs_frontend_remove_event_callback(on_frontend_event, nullptr);
+	if (!g_frontend_gone)
+		obs_frontend_remove_event_callback(on_frontend_event, nullptr);
 	websocket::unregister_vendor();
 	Controller::destroy();
 	obs_log(LOG_INFO, "unloaded");

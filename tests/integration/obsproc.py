@@ -49,8 +49,29 @@ class ObsProcess:
             self.proc.wait(timeout)
             return True
         except subprocess.TimeoutExpired:
+            self.capture_hang_report()
             self.kill()
             return False
+
+    def capture_hang_report(self):
+        """Makes a hung OBS crash on purpose so its crash handler logs every thread's stack."""
+        kernel32 = ctypes.windll.kernel32
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.CreateRemoteThread.restype = wintypes.HANDLE
+        kernel32.CreateRemoteThread.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p,
+                                                ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p]
+        handle = kernel32.OpenProcess(0x1F0FFF, False, self.proc.pid)
+        if handle:
+            kernel32.CreateRemoteThread(handle, None, 0, ctypes.c_void_p(0x10), None, 0, None)
+            try:
+                self.proc.wait(15)
+            except subprocess.TimeoutExpired:
+                pass
+            kernel32.CloseHandle(handle)
+
+    def latest_crash(self):
+        crashes = glob.glob(os.path.join(self.obs_dir, "config", "obs-studio", "crashes", "*.txt"))
+        return max(crashes, key=os.path.getmtime) if crashes else None
 
     def kill(self):
         if self.proc and self.proc.poll() is None:
