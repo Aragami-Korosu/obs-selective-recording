@@ -184,6 +184,12 @@ void Controller::on_frontend_event(obs_frontend_event event)
 	case OBS_FRONTEND_EVENT_CANVAS_REMOVED:
 		refresh_canvases();
 		break;
+	case OBS_FRONTEND_EVENT_SCENE_CHANGED:
+	case OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED:
+	case OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED:
+	case OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED:
+		emit currentSceneChanged();
+		break;
 	case OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN:
 		// OBS clears every scene and source right after SCRIPTING_SHUTDOWN and waits for them
 		// to be released, so recordings and mirrors must let go here, not at EXIT.

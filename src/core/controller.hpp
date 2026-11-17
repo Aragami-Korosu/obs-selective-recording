@@ -33,6 +33,7 @@ public:
 
 	Settings &settings() { return settings_; }
 	RouteStore &routes() { return routes_; }
+	bool shutting_down() const { return shutting_down_; }
 
 	std::vector<Pipeline *> pipelines() const;
 	Pipeline *pipeline(const std::string &key) const;
@@ -59,6 +60,7 @@ signals:
 	void warningsChanged();
 	void interruptedChanged();
 	void statsUpdated();
+	void currentSceneChanged();
 
 private:
 	Controller();

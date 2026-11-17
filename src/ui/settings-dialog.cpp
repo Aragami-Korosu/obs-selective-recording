@@ -119,6 +119,11 @@ QWidget *SettingsDialog::build_general()
 	recovery_->setChecked(s.offer_recovery);
 	form->addRow(QString(), recovery_);
 
+	source_buttons_ = new QCheckBox(text("Settings.SourceButtons"), widget);
+	source_buttons_->setChecked(s.source_list_buttons);
+	source_buttons_->setToolTip(text("Settings.SourceButtonsHelp"));
+	form->addRow(text("Settings.Interface"), source_buttons_);
+
 	if (s.recording.container == "mp4") {
 		auto *note = new QLabel(text("Settings.MP4Note"), widget);
 		note->setWordWrap(true);
@@ -251,6 +256,7 @@ void SettingsDialog::apply()
 	s.warnings.live_visibility = warn_video_->isChecked();
 	s.warnings.audio_tracks = warn_audio_->isChecked();
 	s.offer_recovery = recovery_->isChecked();
+	s.source_list_buttons = source_buttons_->isChecked();
 
 	for (const CanvasPage &page : pages_) {
 		CanvasSettings &cs = s.canvas(page.key);

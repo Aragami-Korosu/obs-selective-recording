@@ -81,6 +81,10 @@ target_sources(
     src/ui/route-button.hpp
     src/ui/settings-dialog.cpp
     src/ui/settings-dialog.hpp
+    src/ui/simple-routes.cpp
+    src/ui/simple-routes.hpp
+    src/ui/source-list-buttons.cpp
+    src/ui/source-list-buttons.hpp
     src/video/scene-mirror.cpp
     src/video/scene-mirror.hpp
 )

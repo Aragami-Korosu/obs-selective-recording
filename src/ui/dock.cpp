@@ -149,7 +149,11 @@ Dock::Dock(Controller &controller, QWidget *parent) : QWidget(parent), controlle
 		if (auto *t = static_cast<CanvasTab *>(tabs_->currentWidget()))
 			t->rebuild_if_changed();
 	});
-	structure_timer_.start(1000);
+	structure_timer_.start(500);
+	connect(&controller_, &Controller::currentSceneChanged, this, [this]() {
+		if (auto *t = static_cast<CanvasTab *>(tabs_->currentWidget()))
+			t->rebuild_if_changed();
+	});
 	connect(tabs_, &QTabWidget::currentChanged, this, [this](int) {
 		if (auto *t = static_cast<CanvasTab *>(tabs_->currentWidget()))
 			t->rebuild_if_changed();

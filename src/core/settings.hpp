@@ -55,6 +55,8 @@ public:
 	bool enabled = true;
 	bool offer_recovery = true;
 	bool dock_introduced = false;
+	bool simple_mode = true;
+	bool source_list_buttons = true;
 	RecordingDefaults recording;
 	WarningSettings warnings;
 

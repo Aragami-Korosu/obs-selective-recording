@@ -65,6 +65,9 @@ void Settings::load()
 	enabled = !obs_data_has_user_value(data, "plugin_enabled") || obs_data_get_bool(data, "plugin_enabled");
 	offer_recovery = !obs_data_has_user_value(data, "offer_recovery") || obs_data_get_bool(data, "offer_recovery");
 	dock_introduced = obs_data_get_bool(data, "dock_introduced");
+	simple_mode = !obs_data_has_user_value(data, "simple_mode") || obs_data_get_bool(data, "simple_mode");
+	source_list_buttons = !obs_data_has_user_value(data, "source_list_buttons") ||
+			      obs_data_get_bool(data, "source_list_buttons");
 
 	OBSDataAutoRelease rec = obs_data_get_obj(data, "recording");
 	if (rec) {
@@ -121,6 +124,8 @@ void Settings::save() const
 	obs_data_set_bool(data, "plugin_enabled", enabled);
 	obs_data_set_bool(data, "offer_recovery", offer_recovery);
 	obs_data_set_bool(data, "dock_introduced", dock_introduced);
+	obs_data_set_bool(data, "simple_mode", simple_mode);
+	obs_data_set_bool(data, "source_list_buttons", source_list_buttons);
 
 	OBSDataAutoRelease rec = obs_data_create();
 	obs_data_set_string(rec, "container", recording.container.c_str());

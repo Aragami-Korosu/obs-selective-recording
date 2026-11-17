@@ -52,10 +52,18 @@ private:
 		QTreeWidgetItem *tree_item = nullptr;
 		RouteButton *video = nullptr;
 		RouteButton *audio = nullptr;
+		QToolButton *combined = nullptr;
 		QLabel *warning = nullptr;
 	};
 
 	void build_tree();
+	void build_simple();
+	void add_simple_items(QTreeWidgetItem *parent, obs_scene_t *scene, const std::string &scene_name);
+	void add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sceneitem_t *item,
+			    const std::string &scene_name);
+	void show_combined_menu(const Row &row, const QPoint &pos);
+	void set_simple(bool simple);
+	OBSSource current_scene() const;
 	void add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, const std::string &scene_name);
 	void add_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sceneitem_t *item,
 		     const std::string &scene_name, bool allow_video, bool allow_audio);
@@ -78,6 +86,9 @@ private:
 	std::string key_;
 	std::vector<Row> rows_;
 	std::string signature_;
+	bool simple_ = true;
+	QLabel *scene_label_ = nullptr;
+	QToolButton *mode_button_ = nullptr;
 
 	QLineEdit *search_ = nullptr;
 	QComboBox *filter_ = nullptr;

@@ -9,7 +9,9 @@
 #include "ui/preview-widget.hpp"
 #include "ui/route-button.hpp"
 #include "ui/settings-dialog.hpp"
+#include "ui/simple-routes.hpp"
 
+#include <obs-frontend-api.h>
 #include <obs-module.h>
 
 #include <QComboBox>
@@ -25,6 +27,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QSet>
+#include <QSignalBlocker>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QUrl>
@@ -111,9 +114,18 @@ CanvasTab::CanvasTab(Controller &controller, std::string key, QWidget *parent)
 	filter_->addItem(text("Filter.Excluded"), FilterExcluded);
 	filter_->addItem(text("Filter.RecordingOnly"), FilterRecordingOnly);
 	filter_->addItem(text("Filter.Warnings"), FilterWarnings);
+	mode_button_ = new QToolButton(this);
+	mode_button_->setText(text("Simple.Advanced"));
+	mode_button_->setToolTip(text("Simple.AdvancedHelp"));
+	mode_button_->setCheckable(true);
 	filter_row->addWidget(search_, 1);
 	filter_row->addWidget(filter_);
+	filter_row->addWidget(mode_button_);
 	layout->addLayout(filter_row);
+
+	scene_label_ = new QLabel(this);
+	scene_label_->setStyleSheet(QStringLiteral("font-weight: bold;"));
+	layout->addWidget(scene_label_);
 
 	warning_summary_ = new QLabel(this);
 	warning_summary_->setWordWrap(true);
@@ -181,9 +193,52 @@ CanvasTab::CanvasTab(Controller &controller, std::string key, QWidget *parent)
 	connect(preview_button_, &QToolButton::toggled, this, &CanvasTab::toggle_preview);
 	connect(settings, &QToolButton::clicked, this, &CanvasTab::open_settings);
 	connect(folder_, &QToolButton::clicked, this, &CanvasTab::open_folder);
+	connect(mode_button_, &QToolButton::toggled, this, [this](bool advanced) {
+		controller_.settings().simple_mode = !advanced;
+		controller_.settings().save();
+		set_simple(!advanced);
+	});
 
-	rebuild_if_changed(true);
+	simple_ = controller_.settings().simple_mode;
+	mode_button_->setChecked(!simple_);
+	set_simple(simple_);
 	refresh_state();
+}
+
+void CanvasTab::set_simple(bool simple)
+{
+	simple_ = simple;
+	if (mode_button_->isChecked() == simple) {
+		QSignalBlocker block(mode_button_);
+		mode_button_->setChecked(!simple);
+	}
+	filter_->setVisible(!simple);
+	scene_label_->setVisible(simple);
+	tree_->setColumnHidden(ColAudio, simple);
+	tree_->headerItem()->setText(ColVideo, simple ? text("Simple.Column") : text("Dock.Video"));
+	rebuild_if_changed(true);
+}
+
+OBSSource CanvasTab::current_scene() const
+{
+	Pipeline *pipeline = controller_.pipeline(key_);
+	if (!pipeline)
+		return nullptr;
+
+	// Main canvas: the scene OBS's Sources list shows (the preview scene in Studio Mode).
+	if (is_main_canvas(pipeline->canvas())) {
+		OBSSourceAutoRelease scene = obs_frontend_preview_program_mode_active()
+						     ? obs_frontend_get_current_preview_scene()
+						     : obs_frontend_get_current_scene();
+		return scene.Get();
+	}
+
+	OBSSourceAutoRelease channel = obs_canvas_get_channel(pipeline->canvas(), 0);
+	if (channel && obs_source_get_type(channel) == OBS_SOURCE_TYPE_TRANSITION) {
+		OBSSourceAutoRelease active = obs_transition_get_active_source(channel);
+		return active.Get();
+	}
+	return channel.Get();
 }
 
 std::string CanvasTab::structure_signature() const
@@ -192,7 +247,7 @@ std::string CanvasTab::structure_signature() const
 	if (!pipeline)
 		return {};
 
-	std::string sig;
+	std::string sig = simple_ ? "simple:" + source_uuid(current_scene()) : "advanced";
 	std::function<void(obs_scene_t *)> walk = [&](obs_scene_t *scene) {
 		for (auto &item : items_top_first(scene)) {
 			obs_source_t *source = obs_sceneitem_get_source(item);
@@ -251,6 +306,11 @@ void CanvasTab::build_tree()
 	if (!pipeline)
 		return;
 
+	if (simple_) {
+		build_simple();
+		return;
+	}
+
 	OBSSourceAutoRelease program = obs_canvas_get_channel(pipeline->canvas(), 0);
 	OBSSourceAutoRelease current = program && obs_source_get_type(program) == OBS_SOURCE_TYPE_TRANSITION
 					       ? obs_transition_get_active_source(program)
@@ -290,6 +350,93 @@ void CanvasTab::build_tree()
 	refresh_routes();
 	refresh_warnings();
 	apply_filter();
+}
+
+void CanvasTab::build_simple()
+{
+	OBSSource scene = current_scene();
+	const std::string name = source_name(scene);
+	scene_label_->setText(text("Simple.Scene").arg(QString::fromStdString(name)));
+
+	obs_scene_t *s = obs_scene_from_source(scene);
+	if (s)
+		add_simple_items(nullptr, s, name);
+
+	refresh_routes();
+	refresh_warnings();
+	apply_filter();
+}
+
+void CanvasTab::add_simple_items(QTreeWidgetItem *parent, obs_scene_t *scene, const std::string &scene_name)
+{
+	for (auto &item : items_top_first(scene)) {
+		obs_source_t *source = obs_sceneitem_get_source(item);
+		auto *tree_item = parent ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(tree_);
+		tree_item->setText(ColName, QString::fromStdString(source_name(source)));
+
+		const char *type = obs_source_get_display_name(obs_source_get_id(source));
+		tree_item->setToolTip(ColName, type ? QString::fromUtf8(type) : QString());
+		if (!obs_sceneitem_visible(item))
+			tree_item->setForeground(ColName, palette().brush(QPalette::Disabled, QPalette::Text));
+
+		add_simple_row(tree_item, source, item, scene_name);
+
+		if (obs_sceneitem_is_group(item)) {
+			add_simple_items(tree_item, obs_sceneitem_group_get_scene(item), scene_name);
+			tree_item->setExpanded(true);
+		}
+	}
+}
+
+void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sceneitem_t *item,
+			       const std::string &scene_name)
+{
+	Row row;
+	row.source = source;
+	row.item = item;
+	row.uuid = source_uuid(source);
+	row.scene_name = scene_name;
+	row.tree_item = tree_item;
+	const size_t index = rows_.size();
+	tree_item->setData(ColName, kRowRole, (qulonglong)index);
+
+	row.combined = new QToolButton(tree_);
+	row.combined->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	row.combined->setIconSize(QSize(14, 14));
+	row.combined->setMinimumWidth(104);
+	row.combined->setCursor(Qt::PointingHandCursor);
+	row.combined->setContextMenuPolicy(Qt::CustomContextMenu);
+	tree_->setItemWidget(tree_item, ColVideo, row.combined);
+	connect(row.combined, &QToolButton::clicked, this, [this, index]() {
+		const Row &r = rows_[index];
+		cycle_combined_route(controller_, key_, r.source, r.item);
+	});
+	connect(row.combined, &QWidget::customContextMenuRequested, this, [this, index](const QPoint &pos) {
+		show_combined_menu(rows_[index], rows_[index].combined->mapToGlobal(pos));
+	});
+
+	row.warning = new QLabel(tree_);
+	row.warning->setMinimumWidth(18);
+	tree_->setItemWidget(tree_item, ColWarning, row.warning);
+	rows_.push_back(std::move(row));
+}
+
+void CanvasTab::show_combined_menu(const Row &row, const QPoint &pos)
+{
+	OBSSource source = row.source;
+	OBSSceneItem item = row.item;
+
+	QMenu menu(this);
+	menu.addSection(QString::fromStdString(source_name(source)));
+	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
+		CombinedRoute shown;
+		shown.route = r;
+		menu.addAction(route_icon(r, false), combined_label(shown), this,
+			       [this, source, item, r]() { set_combined_route(controller_, key_, source, item, r); });
+	}
+	menu.addSeparator();
+	menu.addAction(text("Simple.Advanced"), this, [this]() { mode_button_->setChecked(true); });
+	menu.exec(pos);
 }
 
 void CanvasTab::add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, const std::string &scene_name)
@@ -360,6 +507,12 @@ void CanvasTab::refresh_routes()
 			row.video->set_route(routes.resolve_video(key_, row.source, row.item));
 		if (row.audio)
 			row.audio->set_route(routes.resolve_audio(key_, row.source));
+		if (row.combined) {
+			const CombinedRoute route = combined_route(controller_, key_, row.source, row.item);
+			row.combined->setIcon(route_icon(route.route, route.mixed));
+			row.combined->setText(combined_label(route));
+			row.combined->setToolTip(combined_tooltip(route));
+		}
 	}
 	apply_filter();
 }
@@ -623,6 +776,19 @@ void CanvasTab::show_tree_menu(const QPoint &pos)
 	QMenu menu(this);
 	menu.addSection(text("Menu.Selected").arg(selected.size()));
 
+	if (simple_) {
+		for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
+			CombinedRoute shown;
+			shown.route = r;
+			menu.addAction(route_icon(r, false), combined_label(shown), this, [this, selected, r]() {
+				for (auto &s : selected)
+					set_combined_route(controller_, key_, s, nullptr, r);
+			});
+		}
+		menu.exec(tree_->viewport()->mapToGlobal(pos));
+		return;
+	}
+
 	QMenu *video = menu.addMenu(text("Dock.Video"));
 	QMenu *audio = menu.addMenu(text("Dock.Audio"));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
@@ -667,8 +833,13 @@ void CanvasTab::apply_filter()
 		if (!needle.isEmpty() && !item->text(ColName).contains(needle, Qt::CaseInsensitive))
 			return false;
 
-		const Route video = row.video ? row.video->route() : Route::Both;
-		const Route audio = row.audio ? row.audio->route() : Route::Both;
+		Route video = row.video ? row.video->route() : Route::Both;
+		Route audio = row.audio ? row.audio->route() : Route::Both;
+		if (row.combined) {
+			video = audio = combined_route(controller_, key_, row.source, row.item).route;
+			if (mode == FilterExcluded)
+				return !in_recording(video);
+		}
 		switch (mode) {
 		case FilterExcluded:
 			return (row.video && !in_recording(video)) || (row.audio && !in_recording(audio));

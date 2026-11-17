@@ -6,6 +6,7 @@
 #include "api/websocket-api.hpp"
 #include "core/controller.hpp"
 #include "ui/dock.hpp"
+#include "ui/source-list-buttons.hpp"
 
 #include <obs-frontend-api.h>
 #include <obs-module.h>
@@ -25,6 +26,17 @@ namespace {
 constexpr const char *kDockId = "selective-recording-dock";
 QPointer<Dock> g_dock;
 bool g_frontend_gone = false;
+
+void show_dock()
+{
+	if (!g_dock)
+		return;
+	if (auto *dock_widget = qobject_cast<QDockWidget *>(g_dock->parentWidget())) {
+		dock_widget->setVisible(true);
+		dock_widget->raise();
+		dock_widget->activateWindow();
+	}
+}
 
 // OBS hides new plugin docks; show ours once so new users can find it.
 void introduce_dock()
@@ -83,6 +95,9 @@ void obs_module_post_load(void)
 		g_dock = dock;
 	else
 		obs_log(LOG_WARNING, "could not add the dock");
+
+	// Streamlabs-style buttons in OBS's own Sources list; owned by the dock.
+	new SourceListButtons(*controller, main_window, show_dock, dock);
 
 	QObject::connect(controller, &Controller::pipelineStateChanged, controller,
 			 [](const QString &) { websocket::emit_state_changed(); });
