@@ -88,6 +88,19 @@ These scripts need a POSIX shell, so on Windows run them from Git Bash or WSL.
 
 For a silent test install that doesn't need administrator rights, run the installer with `/CURRENTUSER /VERYSILENT /DIR=<folder>`.
 
+### Code signing
+
+When the repository secrets `WINDOWS_SIGNING_PFX` (the `.pfx` file, base64-encoded) and `WINDOWS_SIGNING_PASSWORD` are set, CI signs the plugin DLL, the installer and its uninstaller with `signtool`, using SHA-256 and a DigiCert timestamp. Without them, builds are unsigned.
+
+Test builds currently use a **self-signed** "Aragami Korosu" certificate. Windows shows that name as the publisher only on machines that trust it. To trust it, run this in an administrator PowerShell:
+
+```powershell
+packaging\windows\trust-test-certificate.ps1           # trust
+packaging\windows\trust-test-certificate.ps1 -Remove   # undo
+```
+
+Other people will still see "Unknown publisher" until the project uses a certificate from a public certificate authority.
+
 ## Testing
 
 The end-to-end tests run the plugin inside a disposable, portable OBS, record through it, and check the files with ffmpeg. See [tests/integration/README.md](../tests/integration/README.md).

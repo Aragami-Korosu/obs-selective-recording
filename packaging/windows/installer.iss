@@ -50,6 +50,11 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
+#ifdef Sign
+; The sign tool command is passed in with /Ssigntool=... by the packaging script.
+SignTool=signtool
+SignedUninstaller=yes
+#endif
 VersionInfoVersion={#ProductVersion}
 VersionInfoProductName={#AppName}
 VersionInfoDescription={#AppName} installer

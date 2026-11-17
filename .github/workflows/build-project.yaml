@@ -285,6 +285,9 @@ jobs:
 
       - name: Package Plugin 📀
         uses: ./.github/actions/package-plugin
+        env:
+          WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
+          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
         with:
           target: x64
           config: ${{ needs.check-event.outputs.config }}

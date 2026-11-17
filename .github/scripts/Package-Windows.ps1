@@ -59,6 +59,30 @@ function Package {
 
     Remove-Item @RemoveArgs
 
+    # Code signing is optional: it runs when the WINDOWS_SIGNING_PFX (base64) and
+    # WINDOWS_SIGNING_PASSWORD secrets are provided.
+    $SignCommand = $null
+    if ( $env:WINDOWS_SIGNING_PFX -and $env:WINDOWS_SIGNING_PASSWORD ) {
+        Log-Group "Signing ${ProductName}..."
+        $SignTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+        if ( ! $SignTool ) {
+            throw 'signtool.exe was not found'
+        }
+        $PfxPath = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+        [IO.File]::WriteAllBytes($PfxPath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX))
+        $SignCommand = "`"${SignTool}`" sign /fd sha256 /f `"${PfxPath}`" /p `"${env:WINDOWS_SIGNING_PASSWORD}`" /tr http://timestamp.digicert.com /td sha256"
+
+        $Binaries = Get-ChildItem "${ProjectRoot}/release/${Configuration}/${ProductName}/bin/64bit/*.dll"
+        foreach ( $Binary in $Binaries ) {
+            & $SignTool sign /fd sha256 /f $PfxPath /p $env:WINDOWS_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td sha256 $Binary.FullName
+            if ( $LASTEXITCODE -ne 0 ) {
+                throw "Signing $($Binary.Name) failed"
+            }
+        }
+        Log-Group
+    }
+
     Log-Group "Archiving ${ProductName}..."
     $CompressArgs = @{
         Path = (Get-ChildItem -Path "${ProjectRoot}/release/${Configuration}" -Exclude "${OutputName}*.*")
@@ -82,6 +106,9 @@ function Package {
         "/DOutputName=${OutputName}-installer"
         "${ProjectRoot}/packaging/windows/installer.iss"
     )
+    if ( $SignCommand ) {
+        $IsccArgs = @('/DSign', "/Ssigntool=${SignCommand} `$f") + $IsccArgs
+    }
     & $Iscc @IsccArgs
     if ( $LASTEXITCODE -ne 0 ) {
         throw "Installer build failed with exit code ${LASTEXITCODE}"
