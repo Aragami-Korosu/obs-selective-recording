@@ -26,6 +26,7 @@ namespace {
 
 constexpr const char *kButtonName = "selectiveRecordingButton";
 constexpr int kSyncMs = 400;
+constexpr int kRescanTicks = 5;
 
 // Same order as OBS's Sources list: top item first, expanded group children under their group.
 bool enum_item(obs_scene_t *, obs_sceneitem_t *item, void *param)
@@ -43,16 +44,21 @@ bool enum_item(obs_scene_t *, obs_sceneitem_t *item, void *param)
 	return true;
 }
 
-std::vector<OBSSceneItem> listed_items()
+std::vector<OBSSceneItem> scene_items(obs_scene_t *scene)
+{
+	std::vector<OBSSceneItem> items;
+	if (scene)
+		obs_scene_enum_items(scene, enum_item, &items);
+	return items;
+}
+
+// The scene OBS's own Sources list shows.
+std::vector<OBSSceneItem> main_list_items()
 {
 	OBSSourceAutoRelease scene_source = obs_frontend_preview_program_mode_active()
 						    ? obs_frontend_get_current_preview_scene()
 						    : obs_frontend_get_current_scene();
-	std::vector<OBSSceneItem> items;
-	obs_scene_t *scene = obs_scene_from_source(scene_source);
-	if (scene)
-		obs_scene_enum_items(scene, enum_item, &items);
-	return items;
+	return scene_items(obs_scene_from_source(scene_source));
 }
 
 bool row_shows(QWidget *row, const char *name)
@@ -65,6 +71,73 @@ bool row_shows(QWidget *row, const char *name)
 			return true;
 	}
 	return false;
+}
+
+// True when every row the list has built shows the matching item's source name.
+bool rows_match(QAbstractItemView *list, const std::vector<OBSSceneItem> &items)
+{
+	QAbstractItemModel *model = list->model();
+	if (!model || (int)items.size() != model->rowCount())
+		return false;
+	for (int row = 0; row < model->rowCount(); row++) {
+		QWidget *widget = list->indexWidget(model->index(row, 0));
+		if (widget && !row_shows(widget, obs_source_get_name(obs_sceneitem_get_source(items[(size_t)row]))))
+			return false;
+	}
+	return true;
+}
+
+// Finds which canvas and scene another canvas's Sources list (such as Aitum Vertical's)
+// is showing. That list belongs to another plugin, so it is identified by its rows: the
+// canvas's on-air scene is tried first (both sides while a transition runs), then every
+// other scene of the canvas. Only extra canvases are searched; the main list is separate.
+bool match_canvas_list(QAbstractItemView *list, std::string &canvas_key, std::vector<OBSSceneItem> &items)
+{
+	const std::vector<CanvasInfo> canvases = list_canvases();
+
+	auto try_scene = [&](obs_source_t *source, const CanvasInfo &info) {
+		obs_scene_t *scene = obs_scene_from_source(source);
+		if (!scene)
+			return false;
+		std::vector<OBSSceneItem> candidate = scene_items(scene);
+		if (!rows_match(list, candidate))
+			return false;
+		canvas_key = info.key;
+		items = std::move(candidate);
+		return true;
+	};
+
+	for (const CanvasInfo &info : canvases) {
+		if (info.is_main)
+			continue;
+		OBSSourceAutoRelease channel = obs_canvas_get_channel(info.canvas, 0);
+		if (!channel)
+			continue;
+		if (obs_source_get_type(channel) == OBS_SOURCE_TYPE_TRANSITION) {
+			for (auto side : {OBS_TRANSITION_SOURCE_B, OBS_TRANSITION_SOURCE_A}) {
+				OBSSourceAutoRelease scene = obs_transition_get_source(channel, side);
+				if (try_scene(scene, info))
+					return true;
+			}
+		} else if (try_scene(channel, info)) {
+			return true;
+		}
+	}
+
+	for (const CanvasInfo &info : canvases) {
+		if (info.is_main)
+			continue;
+		for (const OBSSource &scene : canvas_scenes(info.canvas)) {
+			if (try_scene(scene, info))
+				return true;
+		}
+	}
+	return false;
+}
+
+std::string canvas_key_of(QToolButton *button)
+{
+	return button->property("canvasKey").toByteArray().toStdString();
 }
 
 OBSSceneItem item_for(QToolButton *button)
@@ -120,31 +193,41 @@ SourceListButtons::~SourceListButtons()
 	remove_all();
 }
 
-bool SourceListButtons::find_list()
+void SourceListButtons::find_lists()
 {
-	if (list_)
-		return true;
 	if (!main_window_)
-		return false;
+		return;
+	if (!main_list_)
+		main_list_ = main_window_->findChild<QAbstractItemView *>(QStringLiteral("sources"));
 
-	list_ = main_window_->findChild<QAbstractItemView *>(QStringLiteral("sources"));
-	if (!list_) {
-		for (QAbstractItemView *view : main_window_->findChildren<QAbstractItemView *>()) {
-			if (qstrcmp(view->metaObject()->className(), "SourceTree") == 0) {
-				list_ = view;
-				break;
-			}
-		}
+	// Other canvases' docks (Aitum Vertical's "Vertical Sources") can appear at any time, so
+	// look for them every few ticks. They use OBS's list class but not its object name.
+	if (ticks_++ % kRescanTicks != 0)
+		return;
+	canvas_lists_.erase(std::remove_if(canvas_lists_.begin(), canvas_lists_.end(),
+					   [](const QPointer<QAbstractItemView> &list) { return list.isNull(); }),
+			    canvas_lists_.end());
+	for (QAbstractItemView *view : main_window_->findChildren<QAbstractItemView *>()) {
+		if (view == main_list_ || qstrcmp(view->metaObject()->className(), "SourceTree") != 0)
+			continue;
+		if (std::find(canvas_lists_.begin(), canvas_lists_.end(), view) == canvas_lists_.end())
+			canvas_lists_.emplace_back(view);
 	}
-	return list_ != nullptr;
 }
 
 void SourceListButtons::remove_all()
 {
-	if (!list_)
-		return;
-	for (QToolButton *button : list_->findChildren<QToolButton *>(QString::fromLatin1(kButtonName)))
-		button->deleteLater();
+	std::vector<QAbstractItemView *> lists;
+	if (main_list_)
+		lists.push_back(main_list_);
+	for (const auto &list : canvas_lists_) {
+		if (list)
+			lists.push_back(list);
+	}
+	for (QAbstractItemView *list : lists) {
+		for (QToolButton *button : list->findChildren<QToolButton *>(QString::fromLatin1(kButtonName)))
+			button->deleteLater();
+	}
 }
 
 void SourceListButtons::sync()
@@ -158,16 +241,30 @@ void SourceListButtons::sync()
 		remove_all();
 		return;
 	}
-	if (!find_list() || !list_->model())
-		return;
+	find_lists();
 
-	QAbstractItemModel *model = list_->model();
-	const std::vector<OBSSceneItem> items = listed_items();
+	if (main_list_ && main_list_->model())
+		sync_list(main_list_, kMainCanvasKey, main_list_items());
+
+	for (const auto &list : canvas_lists_) {
+		if (!list || !list->model())
+			continue;
+		std::string key;
+		std::vector<OBSSceneItem> items;
+		if (match_canvas_list(list, key, items))
+			sync_list(list, key, items);
+	}
+}
+
+void SourceListButtons::sync_list(QAbstractItemView *list, const std::string &canvas_key,
+				  const std::vector<OBSSceneItem> &items)
+{
+	QAbstractItemModel *model = list->model();
 	if ((int)items.size() != model->rowCount())
-		return; // OBS is mid-update; try again on the next tick.
+		return; // The list is mid-update; try again on the next tick.
 
 	for (int row = 0; row < model->rowCount(); row++) {
-		QWidget *widget = list_->indexWidget(model->index(row, 0));
+		QWidget *widget = list->indexWidget(model->index(row, 0));
 		if (!widget)
 			continue;
 
@@ -190,7 +287,7 @@ void SourceListButtons::sync()
 			connect(button, &QToolButton::clicked, this, [this, button]() {
 				OBSSceneItem target = item_for(button);
 				if (target)
-					cycle_combined_route(controller_, kMainCanvasKey,
+					cycle_combined_route(controller_, canvas_key_of(button),
 							     obs_sceneitem_get_source(target), target);
 			});
 			connect(button, &QWidget::customContextMenuRequested, this,
@@ -201,8 +298,9 @@ void SourceListButtons::sync()
 		obs_scene_t *parent = obs_sceneitem_get_scene(item);
 		button->setProperty("sceneUuid", QByteArray(obs_source_get_uuid(obs_scene_get_source(parent))));
 		button->setProperty("itemId", (qlonglong)obs_sceneitem_get_id(item));
+		button->setProperty("canvasKey", QByteArray::fromStdString(canvas_key));
 
-		const CombinedRoute route = combined_route(controller_, kMainCanvasKey, source, item);
+		const CombinedRoute route = combined_route(controller_, canvas_key, source, item);
 		button->setIcon(route_icon(route.route, route.mixed));
 		button->setToolTip(QString::fromUtf8(obs_module_text("PluginName")) + QStringLiteral(": ") +
 				   combined_label(route) + QStringLiteral("\n") + combined_tooltip(route));
@@ -215,14 +313,15 @@ void SourceListButtons::show_menu(QToolButton *button, const QPoint &pos)
 	if (!item)
 		return;
 	obs_source_t *source = obs_sceneitem_get_source(item);
+	const std::string canvas_key = canvas_key_of(button);
 
 	QMenu menu;
 	menu.addSection(QString::fromUtf8(obs_source_get_name(source)));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
 		CombinedRoute shown;
 		shown.route = r;
-		menu.addAction(route_icon(r, false), combined_label(shown), this, [this, item, r]() {
-			set_combined_route(controller_, kMainCanvasKey, obs_sceneitem_get_source(item), item, r);
+		menu.addAction(route_icon(r, false), combined_label(shown), this, [this, item, r, canvas_key]() {
+			set_combined_route(controller_, canvas_key, obs_sceneitem_get_source(item), item, r);
 		});
 	}
 	menu.addSeparator();
