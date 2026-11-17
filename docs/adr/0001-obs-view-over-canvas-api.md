@@ -1,6 +1,6 @@
 # 0001. Use `obs_view` instead of the Canvas API
 
-- **Status:** Accepted
+- **Status:** Accepted, partly superseded by [0005](0005-multi-canvas-support.md). Canvases are now read for discovery, and rendering still uses `obs_view`.
 - **Date:** 2026-11-17
 
 ## Context

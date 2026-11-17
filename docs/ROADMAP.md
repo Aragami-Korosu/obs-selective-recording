@@ -22,7 +22,7 @@ These three questions decide whether the architecture is sound. They come before
 
 | POC | Question | Feeds phase |
 | --- | --- | --- |
-| 1. Independent video | Can a private scene tree be rendered through `obs_view` while the original composition keeps streaming? | 2 |
+| 1. Independent video | Can a private scene tree be rendered through `obs_view` while the original composition keeps streaming? Does it work for a vertical canvas scene too, at a vertical resolution, while Vertical Canvas is streaming? Is `obs_view` or a private canvas the better base? | 2 |
 | 2. Independent audio | Can individual sources be captured, mixed selectively and sent to a separate encoder without affecting the stream? | 4 |
 | 3. Combined pipeline | Can both be muxed into one file with stable A/V sync and correct timestamps at a custom resolution? | 5 |
 
@@ -47,13 +47,15 @@ These three questions decide whether the architecture is sound. They come before
 
 **Goal:** a complete, live inventory of the OBS environment.
 
+- [x] Log the main canvas and every frontend canvas, including Aitum Vertical, on load and on change
 - [ ] Register an empty plugin dock
-- [ ] Enumerate scenes, items, nested scenes and groups
+- [ ] `CanvasManager`: track canvases as they're added and removed
+- [ ] Enumerate scenes for each canvas, plus items, nested scenes and groups
 - [ ] Identify audio-only sources
 - [ ] Track sources by UUID
 - [ ] Handle frontend events and scene signals
 
-**Done when:** every scene, nested source and audio source can be discovered, and renames, scene changes and scene-collection changes are detected.
+**Done when:** every canvas, scene, nested source and audio source can be discovered, and renames, scene changes (on every canvas), scene-collection changes and canvas additions or removals are detected.
 
 ## Phase 2: Video routing engine
 
@@ -64,8 +66,9 @@ These three questions decide whether the architecture is sound. They come before
 - [ ] Render through a separate `obs_view`
 - [ ] Connect a video encoder and a basic output
 - [ ] Test streaming and recording at the same time
+- [ ] Run one selective pipeline per canvas (horizontal and vertical)
 
-**Done when:** both outputs run together, `stream_only` sources are missing from the recording, and the original scene visibility is unchanged.
+**Done when:** both outputs run together, `stream_only` sources are missing from the recording, and the original scene visibility is unchanged. This must hold on the main canvas and on the Aitum Vertical canvas.
 
 ## Phase 3: Scene synchronisation
 
@@ -77,6 +80,8 @@ These three questions decide whether the architecture is sound. They come before
 - [ ] Filters
 - [ ] Scene switching and Studio Mode
 - [ ] Transitions: hard cuts first, then animated
+- [ ] Non-main canvases: follow `channel_change` and Vertical's own transitions, including per-scene transition overrides
+- [ ] Nested scenes that cross canvases
 
 **Done when:** every edit in OBS reaches the recording, scene switches don't interrupt it, and transitions match.
 
@@ -105,14 +110,17 @@ These three questions decide whether the architecture is sound. They come before
 - [ ] Container and path configuration
 - [ ] Start, stop, pause and resume
 - [ ] Error handling and file finalisation
+- [ ] Simultaneous horizontal and vertical selective recordings
+- [ ] Encoder session limit checks
 
-**Done when:** the recording uses its own encoders, starting or stopping it never touches the stream, files are always valid, and failures are reported clearly.
+**Done when:** the recording uses its own encoders, starting or stopping it never touches either stream, files are always valid, and failures are reported clearly.
 
 ## Phase 6: Dock interface
 
 **Goal:** the finished user experience.
 
-- [ ] Source list with video and audio routing controls
+- [ ] A tab for each canvas (Horizontal, Vertical, …)
+- [ ] Source list with video and audio routing controls, plus per-canvas overrides
 - [ ] Search, filtering and group inheritance
 - [ ] Profiles
 - [ ] Recording controls and status
@@ -125,6 +133,8 @@ These three questions decide whether the architecture is sound. They come before
 ## Phase 7: Testing and optimisation
 
 **Test matrix:** single-scene and large collections, nested scenes, groups, browser sources, game, window and display capture, webcams, media sources, audio devices, application audio capture, multiple devices, audio filters, transitions, Studio Mode, deleting a source while recording, switching scene collections, shutting OBS down while recording, and recordings longer than 4 hours.
+
+**Dual output (Aitum Vertical Canvas, latest release and 1.6.0):** a vertical selective recording on its own, and both recordings together, each while both streams are live. Also: Vertical's own recording running at the same time, disabling or removing Vertical while a recording runs, changing the vertical resolution, per-scene transition overrides, and shared tracks between the two streams.
 
 **Measure:** CPU, GPU, memory and dropped frames, with the plugin idle, previewing and recording.
 
@@ -161,6 +171,13 @@ These three questions decide whether the architecture is sound. They come before
 - [ ] Container and file settings
 - [ ] Error handling and recovery
 
+**Dual output**
+- [ ] Selective recording of the Aitum Vertical canvas
+- [ ] Horizontal and vertical selective recordings at the same time
+- [ ] Vertical scene switches and transitions mirrored
+- [ ] Per-canvas routing overrides
+- [ ] Vertical Canvas streams and recordings unaffected
+
 **Interface**
 - [ ] Dockable OBS interface
 - [ ] Source search and filtering
@@ -188,3 +205,6 @@ These three questions decide whether the architecture is sound. They come before
 | OBS API compatibility | Medium | Pinned build dependencies and version tests |
 | Encoder compatibility | Medium | Runtime encoder discovery |
 | GPU overhead | Medium | Render profiling and a preview that costs nothing while closed |
+| Vertical Canvas internal changes | Medium | Rely only on public OBS canvas APIs and test every Vertical release |
+| Encoder sessions with dual output | Medium | Check sessions before starting, with clear errors and a software fallback |
+| Shared audio tracks across canvases | Medium | Detect the conflict and explain it in the dock (ADR-0003) |

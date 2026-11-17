@@ -18,11 +18,16 @@ Most streamers want their recording to differ slightly from their live output. Y
 
 You set video and audio routes separately. For example, your game capture can appear in both outputs while its audio goes only to the recording.
 
+### Works with dual output
+
+Streamlabs turns off Selective Recording when Dual Output is enabled. This plugin is designed for that setup. With [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas), you get a separate selective recording for the **horizontal** and the **vertical** canvas. You can run either one, or both at once, while both streams stay live.
+
 ## Planned features
 
 - A dockable panel listing every source, with separate video and audio routing.
 - A private recording composition that follows your scenes, transforms, filters and transitions automatically.
 - An independent recording audio mix built per source, separate from your OBS track setup.
+- Dual-output support: a separate selective recording for each canvas (horizontal and vertical), with routing rules shared between them and per-canvas exceptions.
 - Independent recording settings: encoder, resolution, frame rate, bitrate and container.
 - A live preview of the recording composition.
 - Routing profiles, hotkeys and settings that persist across restarts.
@@ -36,6 +41,7 @@ See the [specification](docs/SPECIFICATION.md) for the full requirements.
 | --- | --- |
 | **OS** | Windows 10 or 11 (x64). Linux and macOS are planned. |
 | **OBS Studio** | 31.1 or newer |
+| **Aitum Vertical Canvas** *(optional)* | 1.6.0 or newer |
 
 ## Installation
 
@@ -58,4 +64,4 @@ To build from source, see [docs/BUILDING.md](docs/BUILDING.md).
 
 Licensed under the [GNU General Public License v2.0 or later](LICENSE), the same license as OBS Studio.
 
-This project is not affiliated with OBS Project or Streamlabs.
+This project is not affiliated with OBS Project, Streamlabs or Aitum.

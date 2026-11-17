@@ -12,3 +12,5 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - An empty plugin module that loads and unloads cleanly and writes to the OBS log.
 - Build configuration for Windows x64 with Qt6 and the OBS frontend API enabled.
 - Project documentation: specification, architecture, roadmap, configuration schema, build guide and decision records.
+- Multi-canvas design for dual output with Aitum Vertical Canvas 1.6.0+ (ADR-0005).
+- Logging of every detected canvas (main, Aitum Vertical and others) on load and whenever canvases change.

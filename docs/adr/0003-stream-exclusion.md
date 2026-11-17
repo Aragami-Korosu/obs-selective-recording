@@ -32,6 +32,10 @@ Render a second private composition just for the stream.
 
 - ❌ Doubles the rendering cost and takes over OBS's core streaming path. Out of scope.
 
+## Multiple canvases
+
+With Vertical Canvas ([ADR-0005](0005-multi-canvas-support.md)), excluding video is still done per canvas, because each canvas has its own scene items. Audio is different: OBS mixer tracks are shared by every canvas. If the horizontal and vertical streams use the same track, removing a source from that track removes it from both streams. Under option A, the dock has to detect this and say so. The workaround is to give each stream its own track.
+
 ## Decision
 
 Pending. Option A is recommended.

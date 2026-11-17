@@ -34,13 +34,50 @@ flowchart TB
 
 The plugin builds a **second, private composition** alongside OBS's own. That composition reuses OBS's capture sources by reference, so nothing is captured twice. It has its own scene containers, video mix, audio mix and encoders.
 
+## Multiple canvases
+
+The diagram above shows one canvas. In practice the plugin runs **one selective pipeline per canvas**, so the main horizontal canvas and a vertical canvas from [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas) each get their own. See [ADR-0005](adr/0005-multi-canvas-support.md).
+
+```mermaid
+flowchart TB
+    subgraph OBS["OBS Studio"]
+        MAIN["Main canvas<br/>1920×1080"]
+        VERT["'Aitum Vertical' canvas<br/>1080×1920"]
+        SRC["Shared sources"]
+        MAIN -.-> SRC
+        VERT -.-> SRC
+    end
+
+    CM["CanvasManager"] --> PH["Selective pipeline<br/>(horizontal)"]
+    CM --> PV["Selective pipeline<br/>(vertical)"]
+    MAIN -- "frontend scene /<br/>transition events" --> PH
+    VERT -- "channel_change,<br/>transition signals" --> PV
+    RM["RoutingManager<br/>(shared rules +<br/>per-canvas overrides)"] --> PH & PV
+    PH --> F1[("horizontal.mkv")]
+    PV --> F2[("vertical.mkv")]
+```
+
+Each *selective pipeline* is a `SceneMirror`, `VideoPipeline`, `AudioPipeline` and `RecordingController`, all bound to one canvas. Pipelines share the `RoutingManager` and `SettingsManager`, and never share private scenes or encoders.
+
+| Canvas event | Source | Action |
+| --- | --- | --- |
+| `FINISHED_LOADING`, `CANVAS_ADDED` | frontend | Discover canvases and create a pipeline for each enabled one |
+| `CANVAS_REMOVED`, canvas `remove` | frontend, canvas | Stop that pipeline's recording cleanly, then tear it down |
+| `channel_change` (channel 0) | canvas | Switch the private program scene, or attach to the new transition |
+| `transition_start` / `transition_stop` | the canvas's transition source | Drive the private transition |
+| `source_add` / `source_remove` | canvas | Add or remove mirrored scenes |
+| `video_reset` | canvas | Update the default recording resolution, applied on the next start |
+
+The main canvas is followed through frontend events (`SCENE_CHANGED`, `TRANSITION_*`), because OBS's own transition lives outside the canvas channel.
+
 ## Components
 
 Each component owns its own state and exposes a small interface. Components never reach into each other's internals.
 
 | Component | Directory | Responsibility |
 | --- | --- | --- |
-| `SourceManager` | `src/core/` | Enumerates scenes, groups, items and audio sources. Emits change events. |
+| `CanvasManager` | `src/core/` | Discovers canvases, tracks additions and removals, and owns one selective pipeline per enabled canvas. |
+| `SourceManager` | `src/core/` | Enumerates scenes (for each canvas), groups, items and audio sources. Emits change events. |
 | `RoutingManager` | `src/core/` | Resolves the effective video and audio route for any source or item. |
 | `SettingsManager` | `src/core/` | Loads, saves and migrates configuration. |
 | `SceneMirror` | `src/video/` | Builds and maintains the private scene tree from the original scenes. |
@@ -67,7 +104,7 @@ flowchart LR
     G --> H["video_t → encoder"]
 ```
 
-**Private scene tree.** For each original scene, the mirror creates a private scene with `obs_scene_create_private`. It adds the *same* `obs_source_t` objects as items, and copies each item's transform, crop, blend mode, order and visibility. Nested scenes and groups are mirrored recursively, so a nested scene item points to the mirrored child scene instead of the original. See [ADR-0002](adr/0002-private-scene-mirror.md).
+**Private scene tree.** For each original scene on the pipeline's canvas, the mirror creates a private scene with `obs_scene_create_private`. It adds the *same* `obs_source_t` objects as items, and copies each item's transform, crop, blend mode, order and visibility. Nested scenes and groups are mirrored recursively, so a nested scene item points to the mirrored child scene instead of the original. A nested scene can belong to a different canvas, for example a horizontal scene used inside a vertical one, so the mirror resolves the child from whichever canvas owns it. See [ADR-0002](adr/0002-private-scene-mirror.md).
 
 **Rendering.** `obs_view_add2()` adds the private program scene to the render loop with its own `obs_video_info`, which allows a different resolution or frame rate from the canvas. It returns a `video_t` that the video encoder connects to. See [ADR-0001](adr/0001-obs-view-over-canvas-api.md).
 
@@ -119,7 +156,9 @@ stateDiagram-v2
     Error --> Idle: reset
 ```
 
-The plugin creates its own `ffmpeg_muxer` output and its own video and audio encoders. It connects them to the private `video_t` and `audio_t`. OBS's own recording and streaming outputs are never touched.
+For each canvas, the plugin creates its own `ffmpeg_muxer` output and its own video and audio encoders. It connects them to that pipeline's private `video_t` and `audio_t`. OBS's own outputs are never touched, and neither are another plugin's outputs, such as Vertical's stream, recording and replay buffer.
+
+Before starting, the controller checks that the chosen encoder can open another session. With dual streaming plus two selective recordings, hardware encoder session limits can be reached. If that happens, recording fails with a clear message, and the live streams are left untouched.
 
 ## Threading
 

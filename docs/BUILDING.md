@@ -53,7 +53,12 @@ Restart OBS. To check the plugin loaded, open **Help → Log Files → View Curr
 
 ```
 [obs-selective-recording] loaded (version 0.1.0)
+[obs-selective-recording] frontend ready
+[obs-selective-recording] canvas 'Main' (1920x1080)
+[obs-selective-recording] canvas 'Aitum Vertical' (1080x1920)
 ```
+
+The `Aitum Vertical` line appears only if Vertical Canvas 1.6.0 or newer is installed. Canvas names and sizes depend on your setup.
 
 ## Debugging
 
