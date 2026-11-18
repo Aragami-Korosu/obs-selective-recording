@@ -18,6 +18,7 @@ End-to-end tests that run the real plugin inside a disposable, portable OBS. The
 | Recording | Pause and resume; hotkeys; failure on one canvas while the other keeps recording |
 | Quality | A/V offset within one frame of OBS's own recording; no drift; no skipped or dropped frames; audio buffering |
 | Lifecycle | Clean exit while recording finalises files; crash recovery; zero memory leaks; no deprecation warnings |
+| Live stream (optional) | A real stream stays connected, with no reconnects or dropped frames, while recordings start, stop and fail; warnings read the active stream's tracks |
 
 `soak.py` records both canvases for a long time and checks drift, duration accuracy, dropped frames and memory growth.
 
@@ -40,6 +41,21 @@ End-to-end tests that run the real plugin inside a disposable, portable OBS. The
 - installs the plugin into the copy,
 - starts OBS itself and runs every test,
 - closes OBS and checks the log.
+
+### Live stream test
+
+This test is skipped unless you provide a stream key in an environment variable. Use a **throwaway test channel**: the test scenes (solid colours and test tones) are broadcast live. Before going live, the test checks that the setup contains no microphone, desktop audio, screen, window or browser capture, and refuses to stream if it finds any.
+
+```powershell
+$env:SR_TEST_STREAM_KEY = '<test channel key>'               # Twitch by default
+# $env:SR_TEST_STREAM_SERVICE = 'YouTube - RTMPS'           # optional: another OBS service name
+.\run.ps1 -Obs C:\scratch\obs-portable -Plugin C:\path\to\obs-selective-recording -WorkDir C:\scratch\sr-tests
+Remove-Item Env:SR_TEST_STREAM_KEY
+```
+
+The key is only passed to OBS and is never printed. When the test finishes, it restores the test OBS's previous stream settings.
+
+### Soak test
 
 For a soak test, run it after a normal run (it reuses the scenes):
 

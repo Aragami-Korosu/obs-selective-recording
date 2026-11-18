@@ -25,8 +25,8 @@ class ObsProcess:
             cwd=self.bin)
         return self.proc.pid
 
-    def _main_window(self):
-        """OBS's main window; floating docks are separate windows and must not be closed."""
+    def windows(self):
+        """(hwnd, title) for each visible top-level window of the test OBS."""
         found = []
 
         @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -36,11 +36,15 @@ class ObsProcess:
             if pid.value == self.proc.pid and user32.IsWindowVisible(hwnd):
                 title = ctypes.create_unicode_buffer(256)
                 user32.GetWindowTextW(hwnd, title, 256)
-                if title.value.startswith("OBS "):
-                    found.append(hwnd)
+                found.append((hwnd, title.value))
             return True
 
         user32.EnumWindows(callback, 0)
+        return found
+
+    def _main_window(self):
+        """OBS's main window; floating docks are separate windows and must not be closed."""
+        found = [hwnd for hwnd, title in self.windows() if title.startswith("OBS ")]
         return found[0] if found else None
 
     def close(self, timeout=30):
@@ -54,6 +58,8 @@ class ObsProcess:
             self.proc.wait(timeout)
             return True
         except subprocess.TimeoutExpired:
+            # A modal dialog is the usual cause; its title says which one.
+            print(f"  OBS did not exit; open windows: {[title for _, title in self.windows()]}", flush=True)
             self.capture_hang_report()
             self.kill()
             return False

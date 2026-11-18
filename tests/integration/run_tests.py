@@ -337,7 +337,9 @@ def test_av_sync(h):
 
     def start_obs_recording(start):
         h.obs.call("StartRecord")
-        time.sleep(7)
+        if not wait_for(lambda: h.obs.call("GetRecordStatus")["outputActive"], 5):
+            raise RuntimeError("OBS's own recording did not start")
+        time.sleep(max(0, 7 - (time.time() - start)))
         reference["path"] = h.obs.call("StopRecord")["outputPath"]
 
     path = h.record("main", 8, during=start_obs_recording)
@@ -472,6 +474,118 @@ def test_performance(h):
           f"average render {after['averageFrameRenderTime']:.2f} ms")
 
 
+def stream_status(h):
+    return h.obs.call("GetStreamStatus")
+
+
+# Input kinds that could put something real (a voice, a screen, a web page) on air.
+PRIVATE_INPUT_KINDS = ("wasapi", "dshow", "monitor_capture", "window_capture", "game_capture", "browser_source",
+                       "screen_capture", "av_capture", "coreaudio", "pulse", "alsa", "jack", "pipewire", "xshm",
+                       "xcomposite", "v4l2")
+
+
+def test_live_stream(h):
+    """Streams to a real service while recording. Runs only when SR_TEST_STREAM_KEY is set.
+
+    Use a throwaway test channel: the test scenes (solid colours and test tones) go out live.
+    The key is only passed to OBS and is never printed.
+    """
+    key = os.environ.get("SR_TEST_STREAM_KEY")
+    if not key:
+        print("Live stream (skipped: set SR_TEST_STREAM_KEY to run)")
+        return
+    print("Live stream: recording never disturbs the stream (NFR-002)")
+
+    inputs = h.obs.call("GetInputList")["inputs"]
+    private = [i["inputName"] for i in inputs if i["inputKind"].startswith(PRIVATE_INPUT_KINDS)]
+    private += [name for name in h.obs.call("GetSpecialInputs").values() if name]
+    check("nothing but test scenes can go on air (no mic, desktop audio or capture)", not private, private)
+    if private:
+        return
+
+    original = h.obs.call("GetStreamServiceSettings")
+    h.obs.call("SetStreamServiceSettings", {
+        "streamServiceType": "rtmp_common",
+        "streamServiceSettings": {"service": os.environ.get("SR_TEST_STREAM_SERVICE", "Twitch"), "server": "auto",
+                                  "key": key}})
+    try:
+        live_stream_checks(h)
+    finally:
+        h.obs.call("StopStream", allow_fail=True)
+        wait_for(lambda: not stream_status(h)["outputActive"], 20)
+        h.obs.call("SetStreamServiceSettings", {"streamServiceType": original["streamServiceType"],
+                                                "streamServiceSettings": original["streamServiceSettings"]})
+
+
+def live_stream_checks(h):
+    h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+    h.obs.call("StartStream")
+    live = wait_for(lambda: stream_status(h)["outputActive"] and stream_status(h)["outputBytes"] > 0, 30)
+    check("stream connects", live)
+    if not live:
+        return
+    time.sleep(3)
+
+    interruptions = []
+
+    def still_live(step):
+        s = stream_status(h)
+        if not s["outputActive"] or s["outputReconnecting"]:
+            interruptions.append(step)
+
+    stream_before = stream_status(h)
+    stats_before = h.obs.call("GetStats")
+
+    # Both canvases record while live.
+    h.obs.vendor("StartRecording")
+    wait_for(lambda: all(c["state"] == "recording" for c in h.obs.vendor("GetStatus")["canvases"]), 10)
+    main_file = h.status("main")["file"]
+    still_live("start recordings")
+    time.sleep(3)
+    warnings = {(w["canvas"], w["source_name"]): w for w in h.obs.vendor("GetWarnings")["warnings"]}
+    tone = warnings.get(("main", "SR Tone 1000"))
+    check("live: Off audio on the active stream's track is flagged", tone and tone["audio_live"])
+    time.sleep(3)
+    h.obs.vendor("StopRecording")
+    wait_for(lambda: all(c["state"] == "idle" for c in h.obs.vendor("GetStatus")["canvases"]), 20)
+    still_live("stop recordings")
+
+    # Quick start/stop cycles.
+    for _ in range(3):
+        h.record("main", 1.5)
+        still_live("start/stop cycle")
+
+    # A recording that fails must not touch the stream.
+    h.obs.vendor("SetCanvasSettings", {"canvas": VERTICAL, "output_directory": "Q:/missing-drive/sr"})
+    h.obs.vendor("StartRecording", {"canvas": VERTICAL})
+    failed = wait_for(lambda: h.status(VERTICAL)["state"] == "failed", 10)
+    out = os.path.join(h.workdir, "out").replace("\\", "/")
+    h.obs.vendor("SetCanvasSettings", {"canvas": VERTICAL, "output_directory": out})
+    check("live: failed recording reported", failed)
+    still_live("failed recording")
+
+    time.sleep(3)
+    stream_after = stream_status(h)
+    stats_after = h.obs.call("GetStats")
+    still_live("end")
+
+    check("stream stayed live without reconnecting", not interruptions, interruptions)
+    frames = stream_after["outputTotalFrames"] - stream_before["outputTotalFrames"]
+    dropped = stream_after["outputSkippedFrames"] - stream_before["outputSkippedFrames"]
+    check("stream sent frames throughout", frames > 0 and stream_after["outputBytes"] > stream_before["outputBytes"],
+          f"{frames} frames")
+    check("stream dropped under 1% of frames", frames > 0 and dropped / frames < 0.01, f"{dropped}/{frames}")
+    lagged = stats_after["outputSkippedFrames"] - stats_before["outputSkippedFrames"]
+    skipped = stats_after["renderSkippedFrames"] - stats_before["renderSkippedFrames"]
+    check("no encoder frames skipped while streaming and recording", lagged <= 2, f"{lagged} skipped")
+    check("no render frames skipped while streaming and recording", skipped <= 2, f"{skipped} skipped")
+
+    check("live: stream-only box left out of the recording", media.pixel(main_file, 2.0, 300, 300) == "red",
+          media.pixel(main_file, 2.0, 300, 300))
+    check("live: stream-only box still on stream", h.live_color("SR Test A", 300, 300) == "green")
+    check("live: hidden recording-only box still off stream", h.live_color("SR Test A", 900, 300) == "red")
+
+
 def test_disabled(h):
     print("Plugin disabled records everything as live")
     h.obs.vendor("SetEnabled", {"enabled": False})
@@ -550,7 +664,7 @@ def main():
 
     tests = [test_discovery, setup, test_main_recording, test_gain, test_warnings, test_vertical,
              test_failure_isolation, test_pause, test_groups, test_studio_mode, test_transition_blend,
-             test_source_removed, test_hotkey, test_av_sync, test_performance, test_disabled,
+             test_source_removed, test_hotkey, test_av_sync, test_performance, test_live_stream, test_disabled,
              test_collection_switch]
     for test in tests:
         try:
