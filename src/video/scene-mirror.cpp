@@ -97,8 +97,15 @@ SceneMirror::~SceneMirror()
 	canvas_signals_.clear();
 	source_remove_signal_.Disconnect();
 
-	for (auto &[original, m] : mirrors_)
+	// Scenes made in a canvas keep a pointer to the canvas's lock even after they're removed
+	// from it, and libobs destroys them later on its own thread. So the canvas must outlive
+	// them: release them, let libobs finish destroying them, and only then release the canvas.
+	std::vector<OBSWeakSource> scenes;
+	for (auto &[original, m] : mirrors_) {
+		if (m->mirror)
+			scenes.emplace_back(OBSGetWeakRef(obs_scene_get_source(m->mirror)));
 		destroy(*m);
+	}
 	mirrors_.clear();
 
 	{
@@ -107,9 +114,21 @@ SceneMirror::~SceneMirror()
 		scene_map_.clear();
 		scene_names_.clear();
 		transition_ = nullptr;
+		transition_original_ = nullptr;
 	}
 
+	obs_wait_for_destroy_queue();
+	const bool all_gone = std::none_of(scenes.begin(), scenes.end(), [](const OBSWeakSource &weak) {
+		OBSSourceAutoRelease scene = obs_weak_source_get_source(weak);
+		return scene != nullptr;
+	});
+
 	obs_canvas_remove(canvas_);
+	if (!all_gone) {
+		// Something still holds a mirror scene; keep its canvas alive rather than risk a crash.
+		obs_log(LOG_WARNING, "a recording scene outlived its canvas; keeping the canvas");
+		obs_canvas_get_ref(canvas_);
+	}
 }
 
 video_t *SceneMirror::video() const
