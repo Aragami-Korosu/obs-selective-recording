@@ -21,6 +21,8 @@ Streamlabs can hide an item from the stream alone because it runs a modified lib
 2. The cycle, the right-click choices and the tooltips match Streamlabs. Off stays available in the dock's Advanced view. A locked scene item's button is disabled.
 3. **Exception to ADR-0003:** when the user chooses Recording only for a placement, the plugin hides that scene item in OBS, so it leaves the stream at once. It marks the item as hidden by the plugin (`selective_recording_hidden` in the item's private settings). When the placement leaves Recording only, the plugin shows it again, but only if it carries that mark. A placement the user hid themselves is never revealed.
 
+4. **Folders (groups) have no setting of their own**, as in Streamlabs. They follow their eye icon, and the sources inside them are set one by one. This was added after a folder set to Stream only kept a Recording only source inside it out of the recording, while the button had already hidden that source from the stream, so it ended up in neither. Folder routes saved by earlier versions are ignored and removed when the collection loads, and a folder the plugin had hidden is shown again. An optional setting gives folders a button that sets every source inside at once.
+
 Everything else in ADR-0003 stands:
 
 - The plugin changes the live composition only in direct response to the user choosing Recording only, or leaving it, for that one placement.

@@ -1,32 +1,40 @@
 # Changelog
 
-All notable changes to this project are documented here.
+What's new in each version. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.0.0] — first release
 
-## [1.0.0]
+### ✨ What you can do
 
-First release.
+- **Choose where every source goes** with a Streamlabs-style button in OBS's Sources list:
+  - <img src="docs/images/both.svg" width="16"> stream and recording
+  - <img src="docs/images/stream.svg" width="16"> stream only
+  - <img src="docs/images/recording.svg" width="16"> recording only
+- **Record with OBS's own Record button.** It makes your selective recording, just like Streamlabs. You can switch this off in Settings.
+- **Recording only works in one click.** The plugin hides the source from your stream and keeps it in your recording.
+- **Set each placement separately.** The same source in two scenes can be set differently.
+- **Dual output:** use separate selective recordings for your horizontal and [Aitum Vertical](https://github.com/Aitum/obs-vertical-canvas) canvases, at the same time. The buttons also appear in the Vertical Sources dock.
+- **Audio your way:** keep a source's sound on stream but out of the recording, or the reverse, with its own recording volume.
+- **A dock** with a simple view of the current scene, and an Advanced view for audio, per-canvas settings and **Off**.
+- **Recording settings per canvas:** encoder (NVENC, AMD, QuickSync or x264), quality or bitrate, resolution, frame rate, folder, and MKV, MP4 or MOV.
+- **Pause and resume, hotkeys, and a live preview** of exactly what's being recorded.
+- **Warnings** when a source you meant to keep off the stream is still live.
+- **Crash recovery:** interrupted MKV recordings stay playable and are listed the next time OBS starts.
+- **Profiles** of settings, saved with each scene collection, with import and export.
+- **Automation** through obs-websocket, for Stream Deck and scripts.
 
-### Added
+### 📁 Folders
 
-- Selective recording for every OBS canvas, including Aitum Vertical Canvas 1.6+, with horizontal and vertical recordings able to run at the same time.
-- Routes for video and audio: Both, Stream only, Recording only and Off. They can be set for every canvas, for one canvas, or for one placement of a source.
-- A recording composition built from a private copy of your scenes. It follows nested scenes, groups, transforms, crops, blend modes, scene switches, animated transitions, Studio Mode (including Duplicate Scene) and source deletion.
-- Independent recording audio built per source, with OBS's fader, mute, push-to-talk and sync offset, plus a per-source recording volume.
-- Recording settings for each canvas: encoder (automatic, NVENC, AMF, QuickSync or x264), constant quality or bitrate, resolution, frame-rate divisor, folder and filename suffix. Shared settings: container, audio encoder, bitrate and filename format.
-- A fallback to x264 when a hardware encoder can't start.
-- Each canvas handles its own failures, with clear messages. A failure never affects another canvas or a stream.
-- Warnings when a source meant to stay off the stream is still visible live or still on the stream's audio track, including tracks shared between two streams.
-- Streamlabs-style buttons on each source in OBS's Sources list and Aitum Vertical's Vertical Sources dock. Like Streamlabs, each one sets that placement (Both → Stream only → Recording only), Recording only takes the placement off the stream by hiding it in OBS, and locked sources can't be changed. They can be turned off.
-- A dock with a tab for each canvas. The simple view (the default) shows the current scene with one button per source. The Advanced view has separate video and audio controls, per-canvas and per-placement routes, search, filters and bulk changes. Also: profiles (with import and export), preview, pause and resume, status, and an open-folder link. The dock opens on first run.
-- Hotkeys for each canvas, plus start/stop all.
-- Crash recovery: interrupted recordings are listed at the next start.
-- An obs-websocket vendor (`selective-recording`) for automation.
-- A Windows installer that checks the OBS version, won't run while OBS Studio is open (Streamlabs Desktop can stay open), and adds an uninstaller. It can also install Aitum Vertical Canvas 1.6.7 when that version or newer isn't already installed.
-- Integration tests that drive a portable OBS and check recordings pixel by pixel and by frequency, plus a soak test and an optional test on a real live stream.
-- Documentation: user guide, troubleshooting, automation API, specification, architecture, configuration, roadmap and decision records.
+- Folders (OBS groups) have no button and simply follow their eye icon, like in Streamlabs. Set the sources inside them.
+- **Optional:** turn on *folder buttons* in Settings to set every source in a folder with one click.
 
-### Never changed
+### 💿 Installer
 
-- Streams and other plugins' outputs are never modified ([ADR-0003](docs/adr/0003-stream-exclusion.md)). Live scenes change only when you choose Recording only on a Sources-list button, which hides that placement in OBS ([ADR-0008](docs/adr/0008-streamlabs-style-placements.md)).
+- A signed Windows installer that checks your OBS version and can also install Aitum Vertical Canvas.
+- It won't run while OBS Studio is open. Streamlabs Desktop can stay open.
+
+### 🔒 Safe by design
+
+- Your stream settings, audio tracks and other plugins' outputs are never changed.
+- The only change to your live scene is the one you ask for: hiding a source when you choose **Recording only**.
+- If a recording fails, the other canvas's recording and your streams keep going.

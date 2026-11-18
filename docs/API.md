@@ -28,7 +28,7 @@ Canvases are identified by key: `main` for OBS's main canvas, otherwise the canv
 | `SetRoute` | `source_name` or `source_uuid`; `canvas`?; `video`?; `audio`?; `gain_db`? | `ok` |
 | `GetRoute` | `source_name` or `source_uuid`; `canvas`? | `video`, `audio`, `gain_db` |
 | `SetItemRoute` | `scene_name` or `scene_uuid`; `item_id`; `video`; `canvas`? | `ok` |
-| `GetItemRoute` | `scene_name` or `scene_uuid`; `item_id`; `canvas`? | `video`, `locked`, `visible` |
+| `GetItemRoute` | `scene_name` or `scene_uuid`; `item_id`; `canvas`? | `video`, `folder`, `mixed` (folders), `locked`, `visible` |
 | `SetCanvasSettings` | `canvas`; any of `enabled`, `output_directory`, `video_encoder`, `width`, `height`, `fps_divisor` | `ok` |
 | `GetCanvasScenes` | `canvas` | `scenes[]` with `name` and `uuid` |
 | `GetWarnings` | — | `warnings[]` |
@@ -41,6 +41,8 @@ In `SetRoute`, leaving out `canvas` sets the rule for every canvas. Giving a can
 `SetItemRoute` sets one placement's video, exactly like clicking a Sources-list button ([ADR-0008](adr/0008-streamlabs-style-placements.md)):
 - `recording_only` also hides the scene item in OBS, so it leaves the stream, and moving it off `recording_only` shows it again if the plugin hid it.
 - It fails with `ok: false` for a locked scene item.
+- On a **folder** (group), it sets every source inside, like a folder button; the folder itself has no setting. `GetItemRoute` on a folder returns its sources' route, with `mixed: true` when they differ.
+- `SetRoute` on a folder is ignored: folders follow their eye icon.
 - Use `scene_uuid` for scenes on other canvases or for a group's items (the group's UUID). `canvas` (default `main`) is the canvas the scene belongs to; it decides which per-canvas rule the placement falls back to.
 
 `GetCanvasScenes` exists because obs-websocket looks scenes up by name only on the main canvas. Use the UUIDs it returns with obs-websocket's `sceneUuid` fields to work with scenes on other canvases.

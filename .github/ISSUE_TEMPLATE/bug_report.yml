@@ -1,12 +1,17 @@
-name: Bug report
-description: Something isn't working as expected.
+name: 🐞 Bug report
+description: Something isn't working as it should.
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check [Troubleshooting](../blob/main/docs/TROUBLESHOOTING.md) first.
   - type: textarea
-    id: description
+    id: what
     attributes:
       label: What happened?
-      description: What did you expect, and what happened instead?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: I set my facecam to Recording only and pressed Start Recording, but...
     validations:
       required: true
   - type: textarea
@@ -14,33 +19,42 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Set the webcam video route to "Stream only"
-        2. Start recording
-        3. ...
-    validations:
-      required: true
-  - type: input
-    id: plugin-version
-    attributes:
-      label: Plugin version
-    validations:
-      required: true
-  - type: input
-    id: obs-version
-    attributes:
-      label: OBS Studio version
-      description: Help → About
-    validations:
-      required: true
-  - type: input
-    id: os
-    attributes:
-      label: Operating system
-      placeholder: Windows 11 24H2
-    validations:
-      required: true
+        1. ...
+        2. ...
   - type: input
     id: log
     attributes:
       label: OBS log URL
-      description: Help → Log Files → Upload Current Log File
+      description: In OBS, **Help → Log Files → Upload Current Log File**, then paste the link.
+    validations:
+      required: true
+  - type: input
+    id: obs
+    attributes:
+      label: OBS version
+      placeholder: "33.0.1"
+    validations:
+      required: true
+  - type: input
+    id: plugin
+    attributes:
+      label: Selective Recording version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: vertical
+    attributes:
+      label: Aitum Vertical version (if installed)
+      placeholder: "1.6.7"
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+    validations:
+      required: true

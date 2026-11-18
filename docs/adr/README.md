@@ -12,6 +12,7 @@ Each record captures one significant design decision: the context, what was deci
 | [0006](0006-private-canvas-rendering.md) | Render through a private canvas | Accepted |
 | [0007](0007-routes-in-scene-collection.md) | Store routes in the scene collection | Accepted |
 | [0008](0008-streamlabs-style-placements.md) | Streamlabs-style buttons set placements and hide Recording only from the stream | Accepted |
+| [0009](0009-record-button.md) | OBS's Record button records with Selective Recording | Accepted |
 
 ## Template
 

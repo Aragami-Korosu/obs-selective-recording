@@ -6,7 +6,7 @@ Everything can be changed from the dock and the Settings dialog. This page docum
 
 | Data | Location | Why |
 | --- | --- | --- |
-| Routing profiles | Inside each scene collection, under `selective-recording` | Routes refer to source UUIDs, which belong to a collection ([ADR-0007](adr/0007-routes-in-scene-collection.md)) |
+| Routing profiles | Inside each scene collection, under `modules` → `selective-recording` | Routes refer to source UUIDs, which belong to a collection ([ADR-0007](adr/0007-routes-in-scene-collection.md)) |
 | Recording and warning settings | `settings.json` in the plugin config folder | About the machine, not the scenes |
 | Global hotkey | `hotkeys.json` in the plugin config folder | |
 | Per-canvas hotkeys | Inside `settings.json` | |
@@ -15,6 +15,8 @@ Everything can be changed from the dock and the Settings dialog. This page docum
 The plugin config folder is `%APPDATA%\obs-studio\plugin_config\obs-selective-recording\` on Windows, or `config/obs-studio/plugin_config/obs-selective-recording/` in a portable OBS. Files are written atomically and keep a `.bak` copy.
 
 ## Routing profiles (scene collection)
+
+Inside the collection file's `"modules"` object:
 
 ```json
 "selective-recording": {
@@ -85,6 +87,10 @@ Groups and nested scenes pass routes down naturally. A hidden parent hides its c
   "plugin_enabled": true,
   "offer_recovery": true,
   "dock_introduced": true,
+  "simple_mode": true,
+  "source_list_buttons": true,
+  "folder_buttons": false,
+  "record_button": true,
   "recording": {
     "container": "mkv",
     "audio_encoder": "ffmpeg_aac",
@@ -114,6 +120,10 @@ Groups and nested scenes pass routes down naturally. A hidden parent hides its c
 | --- | --- |
 | `plugin_enabled` | When `false`, recordings include every source exactly as it appears live |
 | `offer_recovery` | Check for interrupted recordings at startup |
+| `simple_mode` | The dock shows the simple view |
+| `source_list_buttons` | Buttons in OBS's (and Vertical's) Sources list |
+| `folder_buttons` | Folders get a button that sets every source inside (off by default) |
+| `record_button` | OBS's Record button records with Selective Recording ([ADR-0009](adr/0009-record-button.md)) |
 | `recording.container` | `mkv` (recommended), `mp4` or `mov` |
 | `recording.audio_encoder` | `ffmpeg_aac` or `ffmpeg_opus` |
 | `recording.filename_format` | The same codes as OBS's filename format |

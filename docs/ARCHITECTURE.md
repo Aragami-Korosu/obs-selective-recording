@@ -180,6 +180,18 @@ A click goes through `core/placement` ([ADR-0008](adr/0008-streamlabs-style-plac
 
 Other canvases' Sources lists get the same buttons. Aitum Vertical's "Vertical Sources" dock uses its own copy of OBS's `SourceTree` class with the same row layout and order, but the plugin can't ask it which scene it shows. So every 2 s it looks for `SourceTree` views other than `sources`, and identifies each one by its rows: it tries every extra canvas's on-air scene (both sides of a running transition), then the canvas's other scenes, and uses the first whose items match the rows. Those buttons store their canvas key, so the route is read and set on that canvas.
 
+## Record button
+
+`RecordButtonTakeover` makes OBS's Record button (`recordButton` in the Controls dock) start and stop the selective recordings ([ADR-0009](adr/0009-record-button.md)):
+- It installs an event filter on the button and swallows its mouse and keyboard activation, so OBS's own `RecordButtonClicked` never runs and OBS's recording output is never started.
+- A click toggles every enabled canvas (`Controller::toggle_all`), and the button's text and checked state follow the selective recordings, re-applied every 300 ms.
+- While OBS's own recording is active (its hotkey, obs-websocket), events pass through so OBS can stop it, and the plugin leaves the button to OBS.
+- The setting `record_button` turns it off; the button is then restored to OBS's own state.
+
+## Folders
+
+Folders (groups) have no route of their own ([ADR-0008](adr/0008-streamlabs-style-placements.md)). `RouteStore::resolve_video` returns Both for a group source or group item, so a folder always follows its eye. Folder routes saved by earlier versions are dropped in `remove_missing_sources`, and a folder the plugin had hidden is shown again. With `folder_buttons` on, a folder's button calls `set_folder_route`, which sets every unlocked source inside in one change.
+
 ## Warnings
 
 `evaluate_warnings()` reads OBS state and changes nothing:

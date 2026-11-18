@@ -1,114 +1,155 @@
 # User Guide
 
-## The idea in one minute
+Everything Selective Recording does, step by step. New here? Start with **[The basics](#the-basics)**.
 
-Your stream and your recording don't have to show the same thing. For every source, you choose what goes into the **recording**:
+- [The basics](#the-basics)
+- [The buttons](#the-buttons)
+- [Recording](#recording)
+- [Folders](#folders)
+- [The dock](#the-dock)
+- [Audio](#audio)
+- [Warnings](#warnings-)
+- [Settings](#settings)
+- [Hotkeys](#hotkeys)
+- [After a crash](#after-a-crash)
 
-| Route | In the recording | Your stream |
-| --- | :---: | --- |
-| **Both** | ✅ | Unchanged |
-| **Stream only** | — | Unchanged |
-| **Rec only** | ✅ | Hide it in OBS yourself |
-| **Off** | — | Hide it in OBS yourself |
+## The basics
 
-The plugin records its own copy of your scenes. The quickest way to use it is the buttons in the Sources list, which work like Streamlabs. The dock's Advanced view has finer control: video and audio separately, per canvas or for every canvas. Routes set there never change OBS, so something you want *off the stream* has to be hidden in OBS yourself, and the dock warns you if it's still live.
+Your stream and your recording don't have to show the same thing. Selective Recording keeps **its own copy of your scenes** and records that copy. Your stream is what OBS shows; your recording is what you choose.
 
-## Buttons in the Sources list (like Streamlabs)
+```mermaid
+flowchart LR
+    SCENE["🎬 Your scene in OBS"] -->|"everything visible"| STREAM["📡 Stream"]
+    SCENE -->|"copied, with your choices"| REC["💾 Selective recording"]
+```
 
-Each source in OBS's **Sources** list has a round button next to its eye icon. With Aitum Vertical installed, the **Vertical Sources** dock has them too. They work like Streamlabs Desktop's selective recording:
+## The buttons
 
-| Symbol | Setting |
-| --- | --- |
-| Blue radio waves around a red dot | **Visible on both Stream and Recording** |
-| Blue radio waves (broadcast) | **Only visible on Stream**: left out of the recording |
-| Red record button | **Only visible on Recording**: hidden in OBS, so it's off the stream, but recorded |
+Every source in OBS's **Sources** list has a button next to its eye 👁. With Aitum Vertical, the **Vertical Sources** dock has them too.
 
-- **Click** to cycle Both → Stream only → Recording only. **Right-click** to pick one, open the dock, or hide these buttons (also in Settings → Interface).
-- Each button sets **that placement**: this source in this scene. The same source in another scene, or twice in one scene, can be set differently.
-- **Recording only** hides the placement in OBS for you (its eye turns off), so it leaves the stream straight away and the recording still shows it. Changing it back shows it again. If you had hidden it yourself first, it stays hidden.
-- The buttons set **video**. Sound follows the source's audio setting in the dock's Advanced view, which is Both unless you change it. A Recording only placement is muted on the stream (OBS mutes hidden sources) but keeps its sound in the recording.
-- A **locked** source's button can't be changed. Unlock it in OBS first.
-- If a source shows a grey slashed circle, it's set to **Off** in the dock's Advanced view. Click to set it back to Both.
+| | Setting | Stream | Recording |
+| :---: | --- | :---: | :---: |
+| <img src="images/both.svg" width="24"> | **Stream and recording** | ✅ | ✅ |
+| <img src="images/stream.svg" width="24"> | **Stream only** | ✅ | ❌ |
+| <img src="images/recording.svg" width="24"> | **Recording only** | ❌ | ✅ |
 
-> OBS doesn't offer plugins an official way to add buttons to its Sources list, so these attach to it directly. If a future version of OBS or Aitum Vertical changes that list, the buttons will simply stop appearing until the plugin is updated. The dock always works.
+```mermaid
+flowchart LR
+    B["Stream and<br/>recording"] -->|click| S["Stream only"] -->|click| R["Recording only"] -->|click| B
+```
+
+- **Click** to cycle. **Right-click** to pick a setting, open the dock, or hide the buttons.
+- Each button sets **this source in this scene**. The same source in another scene can be set differently.
+- **Recording only** turns the source's eye off, so it leaves your stream, and keeps it in your recording. Click back to *Stream and recording* and the eye turns on again. If you had turned the eye off yourself first, it stays off.
+- A **locked** source's button is greyed out. Unlock it in OBS to change it.
+- A grey <img src="images/off.svg" width="16"> means the source is set to **Off** in the dock's Advanced view. Click to set it back.
+
+> **Why does Recording only turn the eye off?** Streamlabs uses its own modified OBS that can show a source on one output only. Standard OBS can't, so the plugin hides it from your stream and adds it back in its own recording copy.
+
+## Recording
+
+```mermaid
+flowchart LR
+    PRESS["⏺ Press OBS's<br/>Start Recording"] --> ALL["Every enabled canvas<br/>starts recording"] --> FILES["💾 One file<br/>per canvas"]
+```
+
+- **OBS's Start Recording button** makes your selective recording, like Streamlabs. It records every canvas you've enabled (main, and Aitum Vertical if you have it). Press it again to stop.
+- **The dock** can also start and stop each canvas on its own, and pause or resume.
+- OBS's **Start Recording hotkey** and automation tools still make OBS's *normal* recording, which shows only what's live. To use the hotkey for selective recording, set *Start/stop all selective recordings* under [Hotkeys](#hotkeys).
+- Don't want the Record button taken over? Turn off **Settings → Interface → OBS's Record button records with Selective Recording**.
+
+Files go to OBS's recording folder unless you choose another in Settings. Vertical recordings end in " Aitum Vertical".
+
+## Folders
+
+Folders (OBS groups) work like in Streamlabs:
+
+```mermaid
+flowchart TB
+    F["📁 Folder<br/>no button: follows its eye 👁"] --> A["Source A<br/>its own button"]
+    F --> B2["Source B<br/>its own button"]
+```
+
+- A folder has **no button**. It just follows its eye: if the folder's eye is off, nothing inside it is on stream *or* in the recording.
+- Set **the sources inside** the folder one by one.
+- **Want one click for the whole folder?** Turn on **Settings → Interface → Give folders a button that sets every source inside**. The folder's button then sets all its sources at once, and shows an amber dot when they're set differently.
 
 ## The dock
 
-On first run, the **Selective Recording** dock opens as a floating window. You can attach it to the side of OBS like any other dock. If you close it, reopen it from **Docks → Selective Recording**.
+The **Selective Recording** dock opens the first time OBS starts with the plugin. Reopen it any time from **Docks → Selective Recording**.
 
-- **Enabled**: when unchecked, recordings include everything exactly as it appears live.
-- **Profile**: switch between saved sets of routes. Use **⋯** to create, duplicate, rename, delete, import or export profiles. Profiles are saved with the scene collection.
-- **Tabs**: one for each canvas. With Aitum Vertical installed, you'll see **Main** and **Aitum Vertical**.
+| Part | What it does |
+| --- | --- |
+| **Enabled** | Untick to record everything exactly as it's live |
+| **Profile** | Saved sets of choices (**⋯** to add, rename, import, export) |
+| **Settings** | Recording and interface options (see [Settings](#settings)) |
+| **Tabs** | One per canvas: **Main** and **Aitum Vertical** |
+| **Simple view** | The current scene with the same buttons as the Sources list |
+| **Advanced** | Every scene, with separate **Video** and **Audio** buttons |
+| **Preview** | Shows exactly what's being recorded |
 
-### Simple view
+<details>
+<summary><b>Advanced view in detail</b></summary>
 
-By default, each tab shows the **current scene** with the same one-click placement buttons as the Sources list. On the Main tab, that's the scene selected in OBS (the preview scene in Studio Mode). On the Aitum Vertical tab, it's the vertical scene on air. Right-click a button to pick a setting or switch to Advanced.
-
-### Advanced view: setting routes
-
-Click **Advanced** to see every scene on the canvas, with separate **Video** and **Audio** buttons:
-
-- **Click** a button to cycle through Both → Stream only → Rec only → Off.
-- **Right-click** for more options:
-  - **Every canvas** (the normal choice)
-  - **Only on this canvas**, for example to keep a webcam out of the vertical recording only
-  - **Only this placement**, when the same source appears in several scenes
-  - **Recording volume…**, which adds gain to the recording only (audio)
+- **Click** a Video or Audio button to cycle Both → Stream only → Recording only → Off.
+- **Right-click** for:
+  - **Every canvas** (normal)
+  - **Only on this canvas**, for example to leave a webcam out of the vertical recording only
+  - **Only this placement**, when the same source is in several scenes
+  - **Recording volume…** (audio only)
   - **Reset to default**
-- **Italic** buttons show the profile default. A **•** marks an override for one canvas or one placement.
-- Select several rows and right-click anywhere in the list to change them all at once.
+- *Italic* means the profile default. A **•** marks a setting for one canvas or one placement.
+- Select several rows and right-click to change them all.
+- Search and filter: *Left out of recording*, *Recording only*, *Has warnings*.
+- Settings made here **never change OBS**. If you set something to Recording only or Off here, hide it in OBS yourself; the dock warns you until you do.
 
-Search and the filter menu help in big setups: *Left out of recording*, *Recording only*, *Has warnings*.
+</details>
 
-### Warnings ⚠
+## Audio
 
-A ⚠ appears when a source is set to **Rec only** or **Off** but is still reaching your stream:
+The buttons set what you **see**. Sound is set per source in the dock's **Advanced** view (Audio column), and is *Stream and recording* unless you change it.
 
-- **Still visible live:** hide it in the scene (the eye icon).
-- **Still on the stream's audio track:** open **Edit → Advanced Audio Properties** and untick the track your stream uses.
-- **Shared track:** your horizontal and vertical streams use the same audio track, so removing the source from it would remove it from both. Give each stream its own track.
+| You want | Set the Audio button to |
+| --- | --- |
+| Music on stream, not in the recording | **Stream only** |
+| A mic or sound only in the recording | **Recording only** (and untick it from the stream's track in OBS) |
+| Louder or quieter in the recording only | Right-click → **Recording volume…** |
 
-Hover the ⚠ for exactly what to change. Warnings can be turned off in Settings.
+A source set to **Recording only** with its button is muted on stream (OBS mutes hidden sources) but keeps its sound in the recording.
 
-### Recording
+## Warnings ⚠
 
-- **Start recording / Stop recording** for this canvas, or **Start all recordings** at the bottom.
-- **Pause / Resume**: paused time is left out of the file.
-- **Preview** shows exactly what's being recorded. It only uses resources while it's open.
-- The status line shows duration, size and dropped frames. Hover it for encoder and audio buffering details. **Open folder** shows the file.
+A ⚠ in the dock means something you wanted off the stream is still reaching it:
 
-Each canvas records on its own. If one fails (for example its disk fills up), the other keeps recording and your streams aren't affected.
+- **Still visible live:** turn its eye off in OBS (the button does this for you).
+- **Still on the stream's audio track:** open **Edit → Advanced Audio Properties** and untick the stream's track.
+- **Shared track:** your horizontal and vertical streams use the same audio track, so you can't remove a source from just one. Give each stream its own track.
+
+Hover the ⚠ for exactly what to change.
 
 ## Settings
 
-**General** (all canvases):
-- **Container:** MKV is recommended because it survives crashes. Remux to MP4 later with **File → Remux Recordings**.
-- **Audio encoder and bitrate**, and the **filename format** (same codes as OBS).
-- **Fallback to x264** if a hardware encoder can't start. Streaming on two canvases while recording both can exceed your graphics card's encoder limit.
-- **Warnings** and the **recovery check**.
+Open with the **Settings** button in the dock.
 
-**One tab per canvas:**
-- **Allow selective recording on this canvas**
-- **Resolution:** the canvas size, or a custom size
-- **Frame rate:** the same as OBS, or a half, third or quarter of it
-- **Video encoder:** Automatic picks NVENC, AMF or QuickSync if available, otherwise x264
-- **Rate control:** constant quality (lower number = better) or constant bitrate
-- **Recording folder:** empty means OBS's recording folder
-- **Filename suffix:** vertical recordings get " Aitum Vertical" added by default
+| Tab | Options |
+| --- | --- |
+| **General** | Container (MKV recommended; remux later with **File → Remux Recordings**), audio encoder and bitrate, filename format, fall back to x264 if a hardware encoder fails, warnings, crash recovery, and **Interface**: Sources-list buttons, folder buttons, OBS's Record button |
+| **One per canvas** | Allow selective recording, resolution, frame rate (full, ½, ⅓ or ¼), encoder (Automatic picks NVENC, AMD or QuickSync, else x264), quality or bitrate, folder, filename suffix |
 
 Changes apply to the next recording.
 
 ## Hotkeys
 
-In **Settings → Hotkeys** (OBS's settings), search for "selective":
-- **Start/stop selective recording (canvas)**
-- **Pause/resume selective recording (canvas)**
+In OBS's **Settings → Hotkeys**, search for "selective":
+
+- **Start/stop selective recording** (one per canvas)
+- **Pause/resume selective recording** (one per canvas)
 - **Start/stop all selective recordings**
 
 ## After a crash
 
-If OBS stops unexpectedly while recording, the dock shows the interrupted files the next time it starts. MKV files play as they are. **Show files** opens the folder, and **Dismiss** clears the notice.
+If OBS stops unexpectedly while recording, the dock lists the interrupted files the next time it starts. MKV files play as they are. **Show files** opens the folder; **Dismiss** clears the notice.
 
-## Automation
+---
 
-Stream Deck and other obs-websocket tools can control the plugin. See [API.md](API.md).
+Stream Deck or scripts? See the [automation API](API.md). Something not working? See [Troubleshooting](TROUBLESHOOTING.md).

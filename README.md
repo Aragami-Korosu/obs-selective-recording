@@ -1,101 +1,147 @@
 # OBS Selective Recording
 
-Record a different mix of sources than you stream. You decide, for every source and separately for video and audio, what goes into the recording. Your stream stays exactly as you built it. It works on every canvas, including [Aitum Vertical](https://github.com/Aitum/obs-vertical-canvas), so horizontal and vertical can each have their own selective recording.
+**Record something different from what you stream, just like Streamlabs, in OBS Studio.**
 
-## What it does
+[![License: GPL v2+](https://img.shields.io/badge/license-GPL--2.0--or--later-blue)](LICENSE)
+[![OBS 31.1+](https://img.shields.io/badge/OBS%20Studio-31.1%2B-302E31?logo=obsstudio&logoColor=white)](https://obsproject.com/)
+[![Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6?logo=windows&logoColor=white)](#install)
+[![Aitum Vertical](https://img.shields.io/badge/works%20with-Aitum%20Vertical-8A2BE2)](https://github.com/Aitum/obs-vertical-canvas)
+[![Version](https://img.shields.io/badge/version-1.0.0-green)](CHANGELOG.md)
 
-Most streamers want their recording to be a little different from what goes live. You might drop alerts and chat overlays from the YouTube upload, keep copyrighted music off the VOD, or record a camera you don't show on stream. Selective Recording adds a dock where you choose what goes into the recording for each source:
+Keep alerts and chat off your YouTube upload. Keep a facecam or "BRB" screen in the recording but off stream. Every source in OBS gets a button, and one click decides where it goes.
 
-| Route | In the recording | Your stream |
-| --- | :---: | --- |
-| **Both** | ✅ | Unchanged |
-| **Stream only** | — | Unchanged |
-| **Rec only** | ✅ | Hide it in OBS. The plugin warns you if it's still live. |
-| **Off** | — | Hide it in OBS. The plugin warns you if it's still live. |
+```mermaid
+flowchart LR
+    SCENE["🎬 Your OBS scene"] --> STREAM["📡 Stream<br/>what viewers see"]
+    SCENE --> COPY["🧩 Selective Recording<br/>keeps its own copy"]
+    COPY --> FILE["💾 Recording<br/>your edit for YouTube"]
+```
 
-> **Recording only works like Streamlabs.** Click a source's button to **Recording only** and the plugin hides it in OBS, so it leaves your stream, while your recording keeps it. That one click is the only time the plugin changes your live scene. Otherwise it only controls its own recordings: it never changes your streams' outputs, audio tracks or other plugins' outputs, and a recording problem can't change what your viewers see.
+## The buttons
 
-### Works with dual output
+Every source in OBS's **Sources** list (and in Aitum Vertical's) gets a button next to its eye 👁 icon. Click it to cycle through:
 
-Streamlabs turns off Selective Recording when Dual Output is on. This plugin is built for that setup: with Aitum Vertical Canvas you get a selective recording for the **horizontal** canvas and one for the **vertical** canvas. You can run either or both while both streams are live. If one recording fails, the other keeps going.
+| | Setting | On stream | In recording | Good for |
+| :---: | --- | :---: | :---: | --- |
+| <img src="docs/images/both.svg" width="24" alt="Both"> | **Stream and recording** | ✅ | ✅ | Your game, camera, everything normal |
+| <img src="docs/images/stream.svg" width="24" alt="Stream only"> | **Stream only** | ✅ | ❌ | Alerts, chat, donation goals, copyrighted music |
+| <img src="docs/images/recording.svg" width="24" alt="Recording only"> | **Recording only** | ❌ | ✅ | A facecam or overlay just for the YouTube cut |
 
-## Features
-
-- A Streamlabs-style button on every source in OBS's own Sources list (and Aitum Vertical's), plus a simple dock view of the current scene
-- An advanced view with every scene and separate video and audio routing
-- Routes for every canvas, for one canvas only, or for one placement of a source
-- Warnings when a source you meant to keep off the stream is still live, including audio still on the stream's track
-- A recording composition that follows your scenes, nested scenes, groups, transforms, transitions and Studio Mode automatically
-- Independent recording audio built per source, with OBS's fader, mute and sync offset, plus per-source recording volume
-- Independent recording settings for each canvas: encoder (NVENC, AMF, QuickSync, x264), resolution, frame rate, quality or bitrate, folder and container (MKV, MP4, MOV)
-- Pause and resume, hotkeys, and a live preview of exactly what's being recorded
-- Routing profiles saved with your scene collection, plus import and export
-- Crash recovery: interrupted MKV recordings stay playable and are listed when OBS starts again
-- Automation through obs-websocket (Stream Deck and others)
-- No accounts, services or Streamlabs required
-
-## Requirements
-
-| | |
-| --- | --- |
-| **OS** | Windows 10 or 11 (x64). macOS and Linux builds are produced but not yet tested. |
-| **OBS Studio** | 31.1 or newer (tested on 33.0.1) |
-| **Aitum Vertical Canvas** *(optional)* | 1.6.0 or newer (tested on 1.6.7) |
-
-## Installation
-
-### Installer (recommended)
-
-1. Close OBS.
-2. Download `obs-selective-recording-<version>-windows-x64-installer.exe` from [Releases](../../releases) and run it.
-3. Start OBS. The **Selective Recording** dock opens on first run (afterwards it's under **Docks**), and a recording button appears next to each source in the Sources list.
-
-The installer checks your OBS version and won't run while OBS Studio is open (Streamlabs Desktop can stay open). To uninstall, use **Settings → Apps → Installed apps → OBS Selective Recording**. Your settings are kept in case you reinstall.
-
-The installer can also install **Aitum Vertical Canvas** for dual output. It's offered only if you don't already have that version or newer. If Vertical is already in OBS's own plugin folder, the installer leaves it alone; update that copy with [Aitum's installer](https://github.com/Aitum/obs-vertical-canvas/releases). Vertical stays installed if you later remove Selective Recording.
-
-### ZIP (manual or portable OBS)
-
-Extract `obs-selective-recording-<version>-windows-x64.zip` into `C:\ProgramData\obs-studio\plugins\`, so the DLL ends up at `...\plugins\obs-selective-recording\bin\64bit\obs-selective-recording.dll`.
-
-For a portable OBS, copy `bin\64bit\*` into OBS's `obs-plugins\64bit` folder and `data\*` into `data\obs-plugins\obs-selective-recording`.
+Each button sets **that source in that scene**, like Streamlabs. Folders don't have a button; set the sources inside them (or [turn on folder buttons](docs/USER-GUIDE.md#folders)).
 
 ## Quick start
 
-Just like Streamlabs, every source in OBS's **Sources** list (and Aitum Vertical's) gets a button next to its eye icon:
+```mermaid
+flowchart LR
+    A["1️⃣ Install and<br/>start OBS"] --> B["2️⃣ Click each source's<br/>button to choose"] --> C["3️⃣ Press OBS's<br/>⏺ Start Recording"]
+```
 
-| Symbol | Meaning |
+1. **Install** the plugin (below) and start OBS.
+2. **Click** the button next to each source until it shows what you want.
+3. **Press OBS's Start Recording** button. It now makes your selective recording, with every canvas you've enabled.
+
+That's it. Your stream doesn't change, and the recording has exactly the sources you chose.
+
+## Install
+
+1. Close OBS.
+2. Download **`obs-selective-recording-<version>-windows-x64-installer.exe`** from [Releases](../../releases) and run it.
+3. Start OBS. The **Selective Recording** dock opens the first time; afterwards it's under **Docks**.
+
+<details>
+<summary>Other ways to install, and how to uninstall</summary>
+
+- **Portable OBS or manual install:** extract the ZIP into `C:\ProgramData\obs-studio\plugins\`. For a portable OBS, copy `bin\64bit\*` into OBS's `obs-plugins\64bit` and `data\*` into `data\obs-plugins\obs-selective-recording`.
+- **Aitum Vertical:** the installer can install it for you if you don't have it.
+- **Uninstall:** Windows **Settings → Apps → Installed apps → OBS Selective Recording**.
+- The installer won't run while OBS Studio is open. Streamlabs Desktop can stay open.
+
+</details>
+
+| Needs | Version |
 | --- | --- |
-| Blue radio waves around a red dot | **Visible on both Stream and Recording** |
-| Blue radio waves (broadcast) | **Only visible on Stream** |
-| Red record button | **Only visible on Recording** |
+| Windows | 10 or 11 (64-bit) |
+| OBS Studio | 31.1 or newer (tested on 33.0.1) |
+| Aitum Vertical Canvas *(optional)* | 1.6 or newer (tested on 1.6.7) |
 
-1. Click the button next to your alerts or chat overlay until it shows the **broadcast** symbol. It stays on stream and is left out of the recording.
-2. Click a source until it shows the **record** symbol to keep it off the stream but in the recording. The plugin hides it in OBS for you.
-3. In the **Selective Recording** dock, click **Start recording**, or **Start all recordings** to record every canvas.
+## Works with dual output
 
-Each button sets that one placement (the source in that scene), like Streamlabs. The dock shows the same buttons for the current scene, plus a tab for Aitum Vertical. Its **Advanced** view adds separate audio control, per-canvas settings and **Off**.
+Streamlabs switches selective recording off when you use Dual Output. This plugin doesn't: with [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas), your **horizontal** and **vertical** canvases each get their own selective recording, at the same time.
 
-The [user guide](docs/USER-GUIDE.md) covers everything else.
+```mermaid
+flowchart TB
+    subgraph H["🖥️ Horizontal canvas"]
+        H1["📡 Stream"]
+        H2["💾 Selective recording"]
+    end
+    subgraph V["📱 Vertical canvas"]
+        V1["📡 Stream"]
+        V2["💾 Selective recording"]
+    end
+```
+
+If one recording fails, the other keeps going, and neither stream is affected.
+
+## Features
+
+- 🔘 **Streamlabs-style buttons** in OBS's Sources list and Aitum Vertical's Vertical Sources dock
+- ⏺ **OBS's Record button records selectively**, just like Streamlabs (you can switch this off)
+- 🔊 **Separate audio control**: keep music on stream but out of the recording, or the other way round
+- 🧭 **Follows everything**: scene switches, transitions, Studio Mode, nested scenes and folders
+- ⚙️ **Recording settings per canvas**: NVENC, AMD, QuickSync or x264, quality, resolution, frame rate, MKV/MP4/MOV
+- ⚠️ **Warnings** if something you wanted off the stream is still live
+- 🛟 **Crash-safe**: recordings survive a crash and are listed when OBS starts again
+- 🎛️ **Stream Deck and automation** through obs-websocket
+- 🔒 **No accounts, no Streamlabs**, nothing sent anywhere
+
+## FAQ
+
+<details>
+<summary><b>My "Recording only" source isn't in my recording</b></summary>
+
+- Make sure you recorded with Selective Recording: OBS's **Start Recording** button (on by default) or the **Selective Recording** dock. OBS's Start Recording *hotkey* still makes OBS's normal recording, which shows only what's live.
+- If the source is inside a folder, check that the folder's eye 👁 is on. A hidden folder hides everything in it.
+
+</details>
+
+<details>
+<summary><b>Why does Recording only turn the eye off?</b></summary>
+
+Streamlabs runs its own modified version of OBS that can show a source on one output but not the other. Standard OBS can't, so the plugin hides the source from your stream (the eye) and adds it back in its own copy for the recording. Click the button back to **Stream and recording** and the eye turns on again.
+
+</details>
+
+<details>
+<summary><b>Does it change my stream?</b></summary>
+
+Only when you choose **Recording only**, which hides that source on stream (that's the point). It never changes your stream settings, audio tracks or anything in other plugins.
+
+</details>
+
+More answers in [Troubleshooting](docs/TROUBLESHOOTING.md).
 
 ## Documentation
 
-| Document | Contents |
+| | |
 | --- | --- |
-| [User guide](docs/USER-GUIDE.md) | The dock, routes, warnings, settings and hotkeys |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common problems and fixes |
-| [Automation API](docs/API.md) | obs-websocket requests and events |
-| [Specification](docs/SPECIFICATION.md) | Requirements and known limitations |
-| [Architecture](docs/ARCHITECTURE.md) | How it works inside |
-| [Configuration](docs/CONFIGURATION.md) | Where settings are stored, and their format |
-| [Roadmap](docs/ROADMAP.md) | Status and what's next |
-| [Building](docs/BUILDING.md) | Building and testing from source |
-| [Decision records](docs/adr/) | Key design decisions and why |
+| 📖 [User guide](docs/USER-GUIDE.md) | Every feature, step by step |
+| 🛠️ [Troubleshooting](docs/TROUBLESHOOTING.md) | Problems and fixes |
+| 🎛️ [Automation API](docs/API.md) | obs-websocket requests for Stream Deck and scripts |
+| 🏗️ [Architecture](docs/ARCHITECTURE.md) | How it works inside |
+| 🧱 [Building](docs/BUILDING.md) | Build and test from source |
+| 📜 [Changelog](CHANGELOG.md) | What's new |
+
+<details>
+<summary>More documents</summary>
+
+[Specification](docs/SPECIFICATION.md) · [Configuration files](docs/CONFIGURATION.md) · [Roadmap](docs/ROADMAP.md) · [Design decisions](docs/adr/)
+
+</details>
 
 ## License
 
-Licensed under the [GNU General Public License v2.0 or later](LICENSE), the same license as OBS Studio.
+[GPL-2.0-or-later](LICENSE), the same license as OBS Studio.
 
-The Windows installer includes an unmodified copy of [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas) by Aitum, licensed under GPL-2.0. Its source code is published next to the installer on each release (`…-vertical-canvas-<version>-source.tar.xz`), and the version is pinned in [packaging/windows/bundled-vertical-canvas.json](packaging/windows/bundled-vertical-canvas.json).
+The Windows installer includes an unmodified copy of [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas) (GPL-2.0, by Aitum). Its source is published with each release.
 
-This project is not affiliated with the OBS Project, Streamlabs or Aitum.
+*Not affiliated with the OBS Project, Streamlabs or Aitum.*

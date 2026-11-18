@@ -1,20 +1,21 @@
-name: Feature request
-description: Suggest an improvement or new capability.
+name: 💡 Feature request
+description: Suggest an idea or improvement.
 labels: [enhancement]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: What problem would this solve?
+      label: What would you like to do?
+      description: Describe what you're trying to achieve, not just the solution.
+      placeholder: When I stream with dual output, I'd like to...
     validations:
       required: true
   - type: textarea
-    id: proposal
+    id: idea
     attributes:
-      label: Proposed solution
-    validations:
-      required: true
+      label: How could it work?
   - type: textarea
-    id: alternatives
+    id: streamlabs
     attributes:
-      label: Alternatives considered
+      label: Does Streamlabs (or another app) do this?
+      description: If so, how? Screenshots help.
