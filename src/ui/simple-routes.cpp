@@ -17,6 +17,7 @@ namespace {
 const QColor kStream(77, 160, 230);
 const QColor kRecord(232, 72, 72);
 const QColor kOff(140, 140, 140);
+const QColor kMixed(240, 180, 60);
 
 void draw_dot(QPainter &p, const QPointF &c, double radius, const QColor &color)
 {
@@ -40,7 +41,7 @@ void draw_waves(QPainter &p, const QPointF &c, double half, const QColor &color)
 	}
 }
 
-QPixmap paint_icon(Route route, int size)
+QPixmap paint_icon(Route route, bool mixed, int size)
 {
 	QPixmap pixmap(size, size);
 	pixmap.fill(Qt::transparent);
@@ -81,16 +82,19 @@ QPixmap paint_icon(Route route, int size)
 		break;
 	}
 	}
+
+	if (mixed)
+		draw_dot(p, QPointF(size - half * 0.3 - 0.5, half * 0.3 + 0.5), half * 0.3, kMixed);
 	return pixmap;
 }
 
 } // namespace
 
-QIcon route_icon(Route route)
+QIcon route_icon(Route route, bool mixed)
 {
 	QIcon icon;
 	for (int size : {16, 20, 32})
-		icon.addPixmap(paint_icon(route, size));
+		icon.addPixmap(paint_icon(route, mixed, size));
 	return icon;
 }
 
@@ -128,6 +132,19 @@ QString route_tooltip(const PlacementRoute &route)
 	}
 	return text + QStringLiteral("\n\n") +
 	       QString::fromUtf8(obs_module_text(route.locked ? "SimpleHelp.Locked" : "SimpleHelp.Click"));
+}
+
+QString folder_tooltip(const FolderRoute &route)
+{
+	QString text;
+	if (route.empty)
+		text = obs_module_text("FolderHelp.Empty");
+	else if (route.mixed)
+		text = obs_module_text("FolderHelp.Mixed");
+	else
+		text = QString::fromUtf8(obs_module_text("FolderHelp.All")).arg(route_label(route.route));
+	return text + QStringLiteral("\n\n") +
+	       QString::fromUtf8(obs_module_text(route.locked ? "SimpleHelp.Locked" : "FolderHelp.Click"));
 }
 
 } // namespace selective_recording

@@ -40,6 +40,8 @@ public:
 
 	void start_all();
 	void stop_all();
+	void toggle_all();
+	bool any_recording() const;
 
 	// Call after changing routes or settings so pipelines, warnings and storage follow.
 	void routes_changed();

@@ -79,6 +79,8 @@ target_sources(
     src/ui/dock.hpp
     src/ui/preview-widget.cpp
     src/ui/preview-widget.hpp
+    src/ui/record-button.cpp
+    src/ui/record-button.hpp
     src/ui/route-button.cpp
     src/ui/route-button.hpp
     src/ui/settings-dialog.cpp

@@ -57,6 +57,8 @@ public:
 	bool dock_introduced = false;
 	bool simple_mode = true;
 	bool source_list_buttons = true;
+	bool folder_buttons = false; // folders get a button that sets every source inside
+	bool record_button = true;   // OBS's Record button records with Selective Recording (ADR-0009)
 	RecordingDefaults recording;
 	WarningSettings warnings;
 

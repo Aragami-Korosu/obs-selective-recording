@@ -7,6 +7,8 @@
 #include <obs.hpp>
 #include <util/platform.h>
 
+#include <cstdlib>
+
 namespace selective_recording {
 
 namespace {
@@ -46,6 +48,20 @@ std::string stamped_key(obs_sceneitem_t *item)
 	OBSDataAutoRelease data = obs_sceneitem_get_private_settings(item);
 	const char *key = obs_data_get_string(data, kPlacementKey);
 	return key ? key : "";
+}
+
+// The scene item a placement key refers to, if it's a folder (group).
+OBSSceneItem folder_for_key(const std::string &key)
+{
+	const size_t slash = key.rfind('/');
+	if (slash == std::string::npos)
+		return nullptr;
+	OBSSourceAutoRelease scene_source = obs_get_source_by_uuid(key.substr(0, slash).c_str());
+	obs_scene_t *scene = obs_group_or_scene_from_source(scene_source);
+	if (!scene)
+		return nullptr;
+	obs_sceneitem_t *item = obs_scene_find_sceneitem_by_id(scene, strtoll(key.c_str() + slash + 1, nullptr, 10));
+	return item && obs_sceneitem_is_group(item) ? OBSSceneItem(item) : OBSSceneItem();
 }
 
 void stamp_key(obs_sceneitem_t *item, const std::string &key)
@@ -209,6 +225,11 @@ ResolvedRoute RouteStore::resolve_video(const std::string &canvas, obs_source_t 
 {
 	const RouteProfile &profile = active();
 
+	// Folders (groups) have no setting of their own: they follow OBS's eye icon, and the sources
+	// inside them are set one by one (ADR-0008).
+	if ((source && obs_source_is_group(source)) || (item && obs_sceneitem_is_group(item)))
+		return {Route::Both, RouteOrigin::ProfileDefault};
+
 	if (item && !profile.item_video.empty()) {
 		const std::string key = item_key(scene_uuid_of(item).c_str(), obs_sceneitem_get_id(item));
 		auto it = profile.item_video.find(key);
@@ -266,6 +287,8 @@ double RouteStore::gain_db(const std::string &canvas, obs_source_t *source) cons
 
 void RouteStore::set_video(const std::string &canvas, obs_source_t *source, std::optional<Route> route)
 {
+	if (source && obs_source_is_group(source))
+		return; // folders follow OBS
 	SourceRule *rule = rule_for(canvas, source, route.has_value());
 	if (!rule)
 		return;
@@ -293,7 +316,7 @@ void RouteStore::set_gain(const std::string &canvas, obs_source_t *source, std::
 
 void RouteStore::set_item_video(obs_sceneitem_t *item, std::optional<Route> route)
 {
-	if (!item)
+	if (!item || obs_sceneitem_is_group(item))
 		return;
 	const std::string key = item_key(scene_uuid_of(item).c_str(), obs_sceneitem_get_id(item));
 	auto &items = profiles_[active_].item_video;
@@ -320,9 +343,19 @@ void RouteStore::remove_missing_sources()
 		return source != nullptr;
 	};
 
+	// Earlier versions let folders (groups) have a video route; they now follow OBS.
+	auto is_folder = [](const std::string &uuid) {
+		OBSSourceAutoRelease source = obs_get_source_by_uuid(uuid.c_str());
+		return source && obs_source_is_group(source);
+	};
+
 	bool removed = false;
 	auto prune = [&](std::map<std::string, SourceRule> &rules) {
 		for (auto it = rules.begin(); it != rules.end();) {
+			if (it->second.video && is_folder(it->first)) {
+				it->second.video.reset();
+				removed = true;
+			}
 			if (it->second.empty() || !exists(it->first)) {
 				it = rules.erase(it);
 				removed = true;
@@ -339,6 +372,16 @@ void RouteStore::remove_missing_sources()
 		for (auto it = profile.item_video.begin(); it != profile.item_video.end();) {
 			const std::string scene_uuid = it->first.substr(0, it->first.find('/'));
 			if (!exists(scene_uuid)) {
+				it = profile.item_video.erase(it);
+				removed = true;
+			} else if (OBSSceneItem folder = folder_for_key(it->first)) {
+				// Folders lost their own setting (ADR-0008). If the plugin hid this one for
+				// Recording only, show it again.
+				OBSDataAutoRelease data = obs_sceneitem_get_private_settings(folder);
+				if (obs_data_get_bool(data, kHiddenByPluginKey)) {
+					obs_data_erase(data, kHiddenByPluginKey);
+					obs_sceneitem_set_visible(folder, true);
+				}
 				it = profile.item_video.erase(it);
 				removed = true;
 			} else {

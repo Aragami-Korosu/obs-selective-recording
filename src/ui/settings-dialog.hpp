@@ -56,6 +56,8 @@ private:
 	QCheckBox *warn_audio_ = nullptr;
 	QCheckBox *recovery_ = nullptr;
 	QCheckBox *source_buttons_ = nullptr;
+	QCheckBox *folder_buttons_ = nullptr;
+	QCheckBox *record_button_ = nullptr;
 	std::vector<CanvasPage> pages_;
 };
 

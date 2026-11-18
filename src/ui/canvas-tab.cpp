@@ -247,7 +247,9 @@ std::string CanvasTab::structure_signature() const
 	if (!pipeline)
 		return {};
 
-	std::string sig = simple_ ? "simple:" + source_uuid(current_scene()) : "advanced";
+	std::string sig = simple_ ? "simple:" + source_uuid(current_scene()) +
+					    (controller_.settings().folder_buttons ? ":folders" : "")
+				  : "advanced";
 	std::function<void(obs_scene_t *)> walk = [&](obs_scene_t *scene) {
 		for (auto &item : items_top_first(scene)) {
 			obs_source_t *source = obs_sceneitem_get_source(item);
@@ -401,18 +403,26 @@ void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source,
 	const size_t index = rows_.size();
 	tree_item->setData(ColName, kRowRole, (qulonglong)index);
 
-	row.placement = new QToolButton(tree_);
-	row.placement->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-	row.placement->setIconSize(QSize(16, 16));
-	row.placement->setMinimumWidth(120);
-	row.placement->setCursor(Qt::PointingHandCursor);
-	row.placement->setContextMenuPolicy(Qt::CustomContextMenu);
-	tree_->setItemWidget(tree_item, ColVideo, row.placement);
-	connect(row.placement, &QToolButton::clicked, this,
-		[this, index]() { cycle_placement_route(controller_, key_, rows_[index].item); });
-	connect(row.placement, &QWidget::customContextMenuRequested, this, [this, index](const QPoint &pos) {
-		show_placement_menu(rows_[index], rows_[index].placement->mapToGlobal(pos));
-	});
+	// Folders get a button only when it's turned on in Settings; it sets the sources inside.
+	const bool folder = obs_sceneitem_is_group(item);
+	if (!folder || controller_.settings().folder_buttons) {
+		row.placement = new QToolButton(tree_);
+		row.placement->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+		row.placement->setIconSize(QSize(16, 16));
+		row.placement->setMinimumWidth(120);
+		row.placement->setCursor(Qt::PointingHandCursor);
+		row.placement->setContextMenuPolicy(Qt::CustomContextMenu);
+		tree_->setItemWidget(tree_item, ColVideo, row.placement);
+		connect(row.placement, &QToolButton::clicked, this, [this, index, folder]() {
+			if (folder)
+				cycle_folder_route(controller_, key_, rows_[index].item);
+			else
+				cycle_placement_route(controller_, key_, rows_[index].item);
+		});
+		connect(row.placement, &QWidget::customContextMenuRequested, this, [this, index](const QPoint &pos) {
+			show_placement_menu(rows_[index], rows_[index].placement->mapToGlobal(pos));
+		});
+	}
 
 	row.warning = new QLabel(tree_);
 	row.warning->setMinimumWidth(18);
@@ -423,16 +433,22 @@ void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source,
 void CanvasTab::show_placement_menu(const Row &row, const QPoint &pos)
 {
 	OBSSceneItem item = row.item;
-	const PlacementRoute current = placement_route(controller_, key_, item);
+	const bool folder = obs_sceneitem_is_group(item);
+	const FolderRoute folder_current = folder_route(controller_, key_, item);
+	const PlacementRoute current = folder ? PlacementRoute{folder_current.route, folder_current.locked}
+					      : placement_route(controller_, key_, item);
 
 	QMenu menu(this);
 	menu.addSection(QString::fromStdString(source_name(row.source)));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly}) {
-		QAction *action = menu.addAction(route_icon(r), route_label(r), this, [this, item, r]() {
-			set_placement_route(controller_, key_, item, r);
+		QAction *action = menu.addAction(route_icon(r), route_label(r), this, [this, item, r, folder]() {
+			if (folder)
+				set_folder_route(controller_, key_, item, r);
+			else
+				set_placement_route(controller_, key_, item, r);
 		});
 		action->setCheckable(true);
-		action->setChecked(r == current.route);
+		action->setChecked(r == current.route && !(folder && folder_current.mixed));
 		action->setEnabled(!current.locked);
 	}
 	menu.addSeparator();
@@ -457,7 +473,8 @@ void CanvasTab::add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, con
 
 		const bool is_group = obs_sceneitem_is_group(item);
 		const bool is_scene = obs_source_is_scene(source);
-		add_row(tree_item, source, item, scene_name, has_video(source) || is_group || is_scene,
+		// Folders follow OBS's eye icon; the sources inside them have the buttons.
+		add_row(tree_item, source, item, scene_name, (has_video(source) || is_scene) && !is_group,
 			has_audio(source) && !is_group && !is_scene);
 
 		if (is_group) {
@@ -508,7 +525,13 @@ void CanvasTab::refresh_routes()
 			row.video->set_route(routes.resolve_video(key_, row.source, row.item));
 		if (row.audio)
 			row.audio->set_route(routes.resolve_audio(key_, row.source));
-		if (row.placement) {
+		if (row.placement && obs_sceneitem_is_group(row.item)) {
+			const FolderRoute route = folder_route(controller_, key_, row.item);
+			row.placement->setIcon(route_icon(route.route, route.mixed));
+			row.placement->setText(route.mixed ? text("Folder.Mixed") : route_label(route.route));
+			row.placement->setToolTip(folder_tooltip(route));
+			row.placement->setEnabled(!route.locked && !route.empty);
+		} else if (row.placement) {
 			const PlacementRoute route = placement_route(controller_, key_, row.item);
 			row.placement->setIcon(route_icon(route.route));
 			row.placement->setText(route_label(route.route));

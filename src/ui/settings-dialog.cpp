@@ -124,6 +124,16 @@ QWidget *SettingsDialog::build_general()
 	source_buttons_->setToolTip(text("Settings.SourceButtonsHelp"));
 	form->addRow(text("Settings.Interface"), source_buttons_);
 
+	folder_buttons_ = new QCheckBox(text("Settings.FolderButtons"), widget);
+	folder_buttons_->setChecked(s.folder_buttons);
+	folder_buttons_->setToolTip(text("Settings.FolderButtonsHelp"));
+	form->addRow(QString(), folder_buttons_);
+
+	record_button_ = new QCheckBox(text("Settings.RecordButton"), widget);
+	record_button_->setChecked(s.record_button);
+	record_button_->setToolTip(text("Settings.RecordButtonHelp"));
+	form->addRow(QString(), record_button_);
+
 	if (s.recording.container == "mp4") {
 		auto *note = new QLabel(text("Settings.MP4Note"), widget);
 		note->setWordWrap(true);
@@ -257,6 +267,8 @@ void SettingsDialog::apply()
 	s.warnings.audio_tracks = warn_audio_->isChecked();
 	s.offer_recovery = recovery_->isChecked();
 	s.source_list_buttons = source_buttons_->isChecked();
+	s.folder_buttons = folder_buttons_->isChecked();
+	s.record_button = record_button_->isChecked();
 
 	for (const CanvasPage &page : pages_) {
 		CanvasSettings &cs = s.canvas(page.key);

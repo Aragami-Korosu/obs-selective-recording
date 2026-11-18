@@ -308,14 +308,37 @@ def test_groups(h):
     check("routing applies inside a group", media.pixel(path, 1.5, 1000, 400) == "red",
           media.pixel(path, 1.5, 1000, 400))
 
-    h.obs.call("SetSceneItemEnabled", {"sceneName": "SR Group Scene", "sceneItemId": group["sceneItemId"],
-                                       "sceneItemEnabled": False})
-    h.obs.vendor("SetRoute", {"source_name": "SR G Group", "video": "recording_only"})
+    h.obs.vendor("SetRoute", {"source_name": "SR G Box2", "video": ""})
+
+    # Folders have no setting of their own (ADR-0008). A folder route saved by an earlier
+    # version, here Stream only, must not keep a Recording only source inside it out of the
+    # recording.
+    items_in = h.obs.call("GetGroupSceneItemList", {"sceneName": "SR G Group"})["sceneItems"]
+    box1 = next(i["sceneItemId"] for i in items_in if i["sourceName"] == "SR G Box1")
+    h.obs.vendor("SetRoute", {"source_name": "SR G Group", "video": "stream_only"})
+    h.obs.vendor("SetItemRoute", {"scene_name": "SR G Group", "item_id": box1, "video": "recording_only"})
     time.sleep(1)
     path = h.record("main", 3)
-    check("hidden recording-only group recorded", media.pixel(path, 1.5, 700, 400) == "green",
+    check("recording-only source inside a folder recorded", media.pixel(path, 1.5, 700, 400) == "green",
           media.pixel(path, 1.5, 700, 400))
-    check("live: hidden group stays hidden", h.live_color("SR Group Scene", 700, 400) == "red")
+    check("live: recording-only source inside a folder off stream",
+          h.live_color("SR Group Scene", 700, 400) == "red")
+    folder = h.obs.vendor("GetItemRoute", {"scene_name": "SR Group Scene", "item_id": group["sceneItemId"]})
+    check("a folder reports itself as a folder", folder.get("folder") is True, folder)
+
+    # A folder button sets every source inside it; the folder itself stays visible.
+    h.obs.vendor("SetItemRoute", {"scene_name": "SR Group Scene", "item_id": group["sceneItemId"],
+                                  "video": "stream_only"})
+    folder = h.obs.vendor("GetItemRoute", {"scene_name": "SR Group Scene", "item_id": group["sceneItemId"]})
+    check("folder button sets every source inside", folder.get("video") == "stream_only" and not folder.get("mixed"),
+          folder)
+    check("folder button leaves the folder visible", folder.get("visible") is True)
+    path = h.record("main", 3)
+    check("folder button: sources inside left out of the recording", media.pixel(path, 1.5, 700, 400) == "red",
+          media.pixel(path, 1.5, 700, 400))
+    h.obs.vendor("SetItemRoute", {"scene_name": "SR Group Scene", "item_id": group["sceneItemId"], "video": "both"})
+    check("back to Both shows the hidden source again",
+          h.obs.vendor("GetItemRoute", {"scene_name": "SR G Group", "item_id": box1})["visible"] is True)
     h.obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
 
 

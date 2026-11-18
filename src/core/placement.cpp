@@ -7,27 +7,27 @@
 
 #include <obs.hpp>
 
+#include <vector>
+
 namespace selective_recording {
 
 namespace {
 
-// Set in a scene item's private settings (saved with the scene collection) while the plugin
-// is hiding it for Recording only, so it only ever re-shows placements it hid itself.
-constexpr const char *kHiddenByPlugin = "selective_recording_hidden";
-
+// The mark (saved with the scene collection) means the plugin only ever re-shows placements
+// it hid itself.
 bool hidden_by_plugin(obs_sceneitem_t *item)
 {
 	OBSDataAutoRelease data = obs_sceneitem_get_private_settings(item);
-	return obs_data_get_bool(data, kHiddenByPlugin);
+	return obs_data_get_bool(data, kHiddenByPluginKey);
 }
 
 void set_hidden_by_plugin(obs_sceneitem_t *item, bool hidden)
 {
 	OBSDataAutoRelease data = obs_sceneitem_get_private_settings(item);
 	if (hidden)
-		obs_data_set_bool(data, kHiddenByPlugin, true);
+		obs_data_set_bool(data, kHiddenByPluginKey, true);
 	else
-		obs_data_erase(data, kHiddenByPlugin);
+		obs_data_erase(data, kHiddenByPluginKey);
 }
 
 } // namespace
@@ -42,9 +42,17 @@ PlacementRoute placement_route(Controller &controller, const std::string &canvas
 	return result;
 }
 
-bool set_placement_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *item, Route route)
+bool has_placement_route(obs_sceneitem_t *item)
 {
-	if (!item || obs_sceneitem_locked(item))
+	return item && !obs_sceneitem_is_group(item);
+}
+
+namespace {
+
+// Sets one placement without notifying, so a folder can set all its sources in one change.
+bool apply_placement_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *item, Route route)
+{
+	if (!has_placement_route(item) || obs_sceneitem_locked(item))
 		return false;
 
 	RouteStore &routes = controller.routes();
@@ -65,26 +73,93 @@ bool set_placement_route(Controller &controller, const std::string &canvas, obs_
 		if (route != Route::Off)
 			obs_sceneitem_set_visible(item, true);
 	}
+	return true;
+}
+
+Route next_in_cycle(Route current)
+{
+	switch (current) {
+	case Route::Both:
+		return Route::StreamOnly;
+	case Route::StreamOnly:
+		return Route::RecordingOnly;
+	case Route::RecordingOnly:
+	case Route::Off:
+		return Route::Both;
+	}
+	return Route::Both;
+}
+
+std::vector<OBSSceneItem> folder_items(obs_sceneitem_t *folder)
+{
+	std::vector<OBSSceneItem> items;
+	obs_scene_t *scene = obs_sceneitem_group_get_scene(folder);
+	if (scene) {
+		obs_scene_enum_items(
+			scene,
+			[](obs_scene_t *, obs_sceneitem_t *item, void *param) {
+				static_cast<std::vector<OBSSceneItem> *>(param)->emplace_back(item);
+				return true;
+			},
+			&items);
+	}
+	return items;
+}
+
+} // namespace
+
+bool set_placement_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *item, Route route)
+{
+	if (!apply_placement_route(controller, canvas, item, route))
+		return false;
 	controller.routes_changed();
 	return true;
 }
 
 bool cycle_placement_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *item)
 {
-	Route next = Route::Both;
-	switch (placement_route(controller, canvas, item).route) {
-	case Route::Both:
-		next = Route::StreamOnly;
-		break;
-	case Route::StreamOnly:
-		next = Route::RecordingOnly;
-		break;
-	case Route::RecordingOnly:
-	case Route::Off:
-		next = Route::Both;
-		break;
+	return set_placement_route(controller, canvas, item,
+				   next_in_cycle(placement_route(controller, canvas, item).route));
+}
+
+FolderRoute folder_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *folder)
+{
+	FolderRoute result;
+	if (!folder || !obs_sceneitem_is_group(folder))
+		return result;
+	result.locked = obs_sceneitem_locked(folder);
+	bool first = true;
+	for (auto &item : folder_items(folder)) {
+		if (!has_placement_route(item))
+			continue;
+		const Route route = placement_route(controller, canvas, item).route;
+		if (first) {
+			result.route = route;
+			first = false;
+		} else if (route != result.route) {
+			result.mixed = true;
+		}
 	}
-	return set_placement_route(controller, canvas, item, next);
+	result.empty = first;
+	return result;
+}
+
+bool set_folder_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *folder, Route route)
+{
+	if (!folder || !obs_sceneitem_is_group(folder) || obs_sceneitem_locked(folder))
+		return false;
+	bool changed = false;
+	for (auto &item : folder_items(folder))
+		changed = apply_placement_route(controller, canvas, item, route) || changed;
+	if (changed)
+		controller.routes_changed();
+	return changed;
+}
+
+bool cycle_folder_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *folder)
+{
+	const FolderRoute current = folder_route(controller, canvas, folder);
+	return set_folder_route(controller, canvas, folder, current.mixed ? Route::Both : next_in_cycle(current.route));
 }
 
 } // namespace selective_recording

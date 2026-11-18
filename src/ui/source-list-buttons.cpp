@@ -274,6 +274,15 @@ void SourceListButtons::sync_list(QAbstractItemView *list, const std::string &ca
 			continue;
 
 		auto *button = widget->findChild<QToolButton *>(QString::fromLatin1(kButtonName));
+
+		// Like Streamlabs, folders have no button, unless folder buttons are turned on in Settings.
+		const bool folder = obs_sceneitem_is_group(item);
+		if (folder && !controller_.settings().folder_buttons) {
+			if (button)
+				button->deleteLater();
+			continue;
+		}
+
 		if (!button) {
 			button = new QToolButton(widget);
 			button->setObjectName(QString::fromLatin1(kButtonName));
@@ -286,7 +295,9 @@ void SourceListButtons::sync_list(QAbstractItemView *list, const std::string &ca
 			button->setStyleSheet(QStringLiteral("QToolButton { border: none; background: transparent; }"));
 			connect(button, &QToolButton::clicked, this, [this, button]() {
 				OBSSceneItem target = item_for(button);
-				if (target)
+				if (target && obs_sceneitem_is_group(target))
+					cycle_folder_route(controller_, canvas_key_of(button), target);
+				else if (target)
 					cycle_placement_route(controller_, canvas_key_of(button), target);
 			});
 			connect(button, &QWidget::customContextMenuRequested, this,
@@ -300,11 +311,18 @@ void SourceListButtons::sync_list(QAbstractItemView *list, const std::string &ca
 		button->setProperty("canvasKey", QByteArray::fromStdString(canvas_key));
 
 		// Like Streamlabs, a locked source's button can't be changed.
-		const PlacementRoute route = placement_route(controller_, canvas_key, item);
-		button->setIcon(route_icon(route.route));
-		button->setEnabled(!route.locked);
-		button->setToolTip(QString::fromUtf8(obs_module_text("PluginName")) + QStringLiteral(": ") +
-				   route_tooltip(route));
+		const QString prefix = QString::fromUtf8(obs_module_text("PluginName")) + QStringLiteral(": ");
+		if (folder) {
+			const FolderRoute route = folder_route(controller_, canvas_key, item);
+			button->setIcon(route_icon(route.route, route.mixed));
+			button->setEnabled(!route.locked && !route.empty);
+			button->setToolTip(prefix + folder_tooltip(route));
+		} else {
+			const PlacementRoute route = placement_route(controller_, canvas_key, item);
+			button->setIcon(route_icon(route.route));
+			button->setEnabled(!route.locked);
+			button->setToolTip(prefix + route_tooltip(route));
+		}
 	}
 }
 
@@ -316,16 +334,22 @@ void SourceListButtons::show_menu(QToolButton *button, const QPoint &pos)
 	obs_source_t *source = obs_sceneitem_get_source(item);
 	const std::string canvas_key = canvas_key_of(button);
 
-	const Route current = placement_route(controller_, canvas_key, item).route;
+	const bool folder = obs_sceneitem_is_group(item);
+	const FolderRoute folder_current = folder_route(controller_, canvas_key, item);
+	const Route current = folder ? folder_current.route : placement_route(controller_, canvas_key, item).route;
 
 	QMenu menu;
 	menu.addSection(QString::fromUtf8(obs_source_get_name(source)));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly}) {
-		QAction *action = menu.addAction(route_icon(r), route_label(r), this, [this, item, r, canvas_key]() {
-			set_placement_route(controller_, canvas_key, item, r);
-		});
+		QAction *action =
+			menu.addAction(route_icon(r), route_label(r), this, [this, item, r, canvas_key, folder]() {
+				if (folder)
+					set_folder_route(controller_, canvas_key, item, r);
+				else
+					set_placement_route(controller_, canvas_key, item, r);
+			});
 		action->setCheckable(true);
-		action->setChecked(r == current);
+		action->setChecked(r == current && !(folder && folder_current.mixed));
 	}
 	menu.addSeparator();
 	menu.addAction(QString::fromUtf8(obs_module_text("Simple.OpenDock")), this, [this]() {

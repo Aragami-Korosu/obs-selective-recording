@@ -53,16 +53,8 @@ void all_hotkey_pressed(void *, obs_hotkey_id, obs_hotkey_t *, bool pressed)
 	if (!pressed)
 		return;
 	post_to_ui([]() {
-		Controller *controller = Controller::instance();
-		if (!controller)
-			return;
-		bool any = false;
-		for (Pipeline *p : controller->pipelines())
-			any = any || p->recording();
-		if (any)
-			controller->stop_all();
-		else
-			controller->start_all();
+		if (Controller *controller = Controller::instance())
+			controller->toggle_all();
 	});
 }
 
@@ -279,6 +271,23 @@ void Controller::stop_all()
 {
 	for (Pipeline *p : pipelines())
 		p->stop();
+}
+
+bool Controller::any_recording() const
+{
+	for (const auto &[key, p] : pipelines_) {
+		if (p->recording())
+			return true;
+	}
+	return false;
+}
+
+void Controller::toggle_all()
+{
+	if (any_recording())
+		stop_all();
+	else
+		start_all();
 }
 
 void Controller::routes_changed()

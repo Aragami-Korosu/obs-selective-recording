@@ -68,6 +68,8 @@ void Settings::load()
 	simple_mode = !obs_data_has_user_value(data, "simple_mode") || obs_data_get_bool(data, "simple_mode");
 	source_list_buttons = !obs_data_has_user_value(data, "source_list_buttons") ||
 			      obs_data_get_bool(data, "source_list_buttons");
+	folder_buttons = obs_data_get_bool(data, "folder_buttons");
+	record_button = !obs_data_has_user_value(data, "record_button") || obs_data_get_bool(data, "record_button");
 
 	OBSDataAutoRelease rec = obs_data_get_obj(data, "recording");
 	if (rec) {
@@ -126,6 +128,8 @@ void Settings::save() const
 	obs_data_set_bool(data, "dock_introduced", dock_introduced);
 	obs_data_set_bool(data, "simple_mode", simple_mode);
 	obs_data_set_bool(data, "source_list_buttons", source_list_buttons);
+	obs_data_set_bool(data, "folder_buttons", folder_buttons);
+	obs_data_set_bool(data, "record_button", record_button);
 
 	OBSDataAutoRelease rec = obs_data_create();
 	obs_data_set_string(rec, "container", recording.container.c_str());

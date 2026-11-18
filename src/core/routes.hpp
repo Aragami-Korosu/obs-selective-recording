@@ -12,9 +12,13 @@
 
 namespace selective_recording {
 
-// What a source contributes to the recording. The stream half is only the user's intent,
-// used for warnings; the plugin never changes the live composition (ADR-0003).
+// What a source contributes to the recording. The stream half is the user's intent, used for
+// warnings. Only the Streamlabs-style buttons act on it, by hiding a Recording only placement
+// in OBS (ADR-0003, ADR-0008).
 enum class Route { Both, StreamOnly, RecordingOnly, Off };
+
+// Set in a scene item's private settings while the plugin is hiding it for Recording only.
+inline constexpr const char *kHiddenByPluginKey = "selective_recording_hidden";
 
 const char *route_to_string(Route route);
 Route route_from_string(const char *value, Route fallback = Route::Both);

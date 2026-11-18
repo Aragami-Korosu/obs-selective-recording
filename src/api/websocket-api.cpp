@@ -248,9 +248,14 @@ void set_item_route(obs_data_t *request, obs_data_t *response, void *)
 			obs_data_set_string(res, "error", "Missing video route.");
 			return;
 		}
-		const bool ok = set_placement_route(c, canvas_arg(req), item, route_from_string(video));
+		// A folder has no setting of its own; like a folder button, this sets every source inside.
+		const Route route = route_from_string(video);
+		const bool folder = obs_sceneitem_is_group(item);
+		const bool ok = folder ? set_folder_route(c, canvas_arg(req), item, route)
+				       : set_placement_route(c, canvas_arg(req), item, route);
 		if (!ok)
-			obs_data_set_string(res, "error", "The source is locked.");
+			obs_data_set_string(res, "error",
+					    folder ? "The folder is locked or empty." : "The source is locked.");
 		obs_data_set_bool(res, "ok", ok);
 	});
 }
@@ -263,9 +268,18 @@ void get_item_route(obs_data_t *request, obs_data_t *response, void *)
 			obs_data_set_string(res, "error", "Unknown scene item.");
 			return;
 		}
-		const PlacementRoute route = placement_route(c, canvas_arg(req), item);
-		obs_data_set_string(res, "video", route_to_string(route.route));
-		obs_data_set_bool(res, "locked", route.locked);
+		if (obs_sceneitem_is_group(item)) {
+			const FolderRoute route = folder_route(c, canvas_arg(req), item);
+			obs_data_set_bool(res, "folder", true);
+			obs_data_set_string(res, "video", route_to_string(route.route));
+			obs_data_set_bool(res, "mixed", route.mixed);
+			obs_data_set_bool(res, "locked", route.locked);
+		} else {
+			const PlacementRoute route = placement_route(c, canvas_arg(req), item);
+			obs_data_set_bool(res, "folder", false);
+			obs_data_set_string(res, "video", route_to_string(route.route));
+			obs_data_set_bool(res, "locked", route.locked);
+		}
 		obs_data_set_bool(res, "visible", obs_sceneitem_visible(item));
 	});
 }

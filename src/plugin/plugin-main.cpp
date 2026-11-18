@@ -6,6 +6,7 @@
 #include "api/websocket-api.hpp"
 #include "core/controller.hpp"
 #include "ui/dock.hpp"
+#include "ui/record-button.hpp"
 #include "ui/source-list-buttons.hpp"
 
 #include <obs-frontend-api.h>
@@ -96,8 +97,10 @@ void obs_module_post_load(void)
 	else
 		obs_log(LOG_WARNING, "could not add the dock");
 
-	// Streamlabs-style buttons in OBS's own Sources list; owned by the dock.
+	// Streamlabs-style buttons in OBS's own Sources list, and OBS's Record button recording with
+	// Selective Recording; both owned by the dock.
 	new SourceListButtons(*controller, main_window, show_dock, dock);
+	new RecordButtonTakeover(*controller, main_window, dock);
 
 	QObject::connect(controller, &Controller::pipelineStateChanged, controller,
 			 [](const QString &) { websocket::emit_state_changed(); });
