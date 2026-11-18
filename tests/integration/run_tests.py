@@ -513,8 +513,14 @@ def test_live_stream(h):
     finally:
         h.obs.call("StopStream", allow_fail=True)
         wait_for(lambda: not stream_status(h)["outputActive"], 20)
-        h.obs.call("SetStreamServiceSettings", {"streamServiceType": original["streamServiceType"],
-                                                "streamServiceSettings": original["streamServiceSettings"]})
+        # OBS merges settings for the same service type, so the key must be cleared explicitly.
+        restored = dict(original["streamServiceSettings"])
+        if restored.get("key", "") in ("", key):
+            restored["key"] = ""
+        # Twice: OBS keeps the previous save as service.json.bak, which must not keep the key either.
+        for _ in range(2):
+            h.obs.call("SetStreamServiceSettings", {"streamServiceType": original["streamServiceType"],
+                                                    "streamServiceSettings": restored})
 
 
 def live_stream_checks(h):
