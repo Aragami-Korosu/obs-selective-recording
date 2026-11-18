@@ -88,6 +88,18 @@ These scripts need a POSIX shell, so on Windows run them from Git Bash or WSL.
 
 For a silent test install that doesn't need administrator rights, run the installer with `/CURRENTUSER /VERYSILENT /DIR=<folder>`.
 
+### Bundled Aitum Vertical Canvas
+
+The installer can also install Aitum Vertical Canvas. [packaging/windows/bundled-vertical-canvas.json](../packaging/windows/bundled-vertical-canvas.json) pins the release and the SHA-256 of its ProgramData package and source archive. The packaging script:
+1. downloads both and stops if a checksum doesn't match;
+2. adds Vertical's `LICENSE` to the package;
+3. puts the source archive in `release/` as `…-windows-x64-vertical-canvas-<version>-source.tar.xz`, so it's published with the installer as GPL-2.0 requires;
+4. passes `/DVerticalDir`, `/DVerticalVersion` and `/DVerticalVersionComponents` to Inno Setup.
+
+To update Vertical, change the version, URLs and checksums in that file. Aitum lists the checksums in each release's notes. Without `/DVerticalDir`, the installer is built without Vertical.
+
+Vertical installs into the sibling folder `…\plugins\vertical-canvas` and is offered only when that version or newer isn't already installed there. If `vertical-canvas.dll` is in OBS's own `obs-plugins\64bit` folder, it isn't offered, because OBS would load two copies.
+
 ### Code signing
 
 When the repository secrets `WINDOWS_SIGNING_PFX` (the `.pfx` file, base64-encoded) and `WINDOWS_SIGNING_PASSWORD` are set, CI signs the plugin DLL, the installer and its uninstaller with `signtool`, using SHA-256 and a DigiCert timestamp. Without them, builds are unsigned.

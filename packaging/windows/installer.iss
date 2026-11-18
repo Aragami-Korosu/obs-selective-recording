@@ -3,6 +3,10 @@
 ;
 ; Built by .github/scripts/Package-Windows.ps1:
 ;   iscc /DProductVersion=1.0.0 /DSourceDir=<plugin folder> /DOutputDir=<dir> /DOutputName=<file> installer.iss
+;
+; With /DVerticalDir=<folder> /DVerticalVersion=1.6.7 /DVerticalVersionComponents=1,6,7,0 it also
+; offers Aitum Vertical Canvas (GPL-2.0, https://github.com/Aitum/obs-vertical-canvas) as an
+; optional component, unless the same or a newer version is already installed.
 
 #ifndef ProductVersion
   #define ProductVersion "0.0.0"
@@ -59,8 +63,24 @@ VersionInfoVersion={#ProductVersion}
 VersionInfoProductName={#AppName}
 VersionInfoDescription={#AppName} installer
 
+#ifdef VerticalDir
+[Types]
+Name: "full"; Description: "Selective Recording and Aitum Vertical Canvas"
+Name: "custom"; Description: "Custom"; Flags: iscustom
+
+[Components]
+Name: "main"; Description: "{#AppName} {#ProductVersion}"; Types: full custom; Flags: fixed
+Name: "vertical"; Description: "Aitum Vertical Canvas {#VerticalVersion}: a second, vertical canvas for TikTok, Shorts and Reels (by Aitum, GPL-2.0)"; Types: full; Check: VerticalOffered
+#endif
+
 [Files]
+#ifdef VerticalDir
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Components: main; Flags: recursesubdirs ignoreversion
+; Vertical is its own plugin, so it stays installed if Selective Recording is removed.
+Source: "{#VerticalDir}\*"; DestDir: "{app}\..\vertical-canvas"; Components: vertical; Flags: recursesubdirs ignoreversion uninsneveruninstall
+#else
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+#endif
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
@@ -69,6 +89,37 @@ Type: filesandordirs; Name: "{app}"
 FinishedLabel=Start OBS Studio. The Selective Recording dock opens on the first run, and a recording button appears next to each source in the Sources list.
 
 [Code]
+#ifdef VerticalDir
+var
+  VerticalChecked, VerticalOfferedResult: Boolean;
+
+// Offers the bundled Vertical unless the same or a newer version is already installed. A copy
+// in OBS's own plugin folder (where Aitum's installer puts it) is left alone: a second copy in
+// ProgramData would make OBS load Vertical twice.
+function VerticalOffered(): Boolean;
+var
+  ObsPath: String;
+  Installed: Int64;
+begin
+  if not VerticalChecked then begin
+    VerticalChecked := True;
+    VerticalOfferedResult := True;
+    if RegQueryStringValue(HKLM64, 'SOFTWARE\OBS Studio', '', ObsPath) and
+       FileExists(AddBackslash(ObsPath) + 'obs-plugins\64bit\vertical-canvas.dll') then
+      VerticalOfferedResult := False
+    else if GetPackedVersion(ExpandConstant('{commonappdata}\obs-studio\plugins\vertical-canvas\bin\64bit\vertical-canvas.dll'), Installed) then
+      VerticalOfferedResult := ComparePackedVersion(Installed, PackVersionComponents({#VerticalVersionComponents})) < 0;
+  end;
+  Result := VerticalOfferedResult;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  // With nothing optional to choose, skip the components page.
+  Result := (PageID = wpSelectComponents) and not VerticalOffered();
+end;
+#endif
+
 function ObsRunning(): Boolean;
 var
   Locator, Service, Processes: Variant;

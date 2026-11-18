@@ -52,6 +52,8 @@ Streamlabs turns off Selective Recording when Dual Output is on. This plugin is 
 
 The installer checks your OBS version and won't run while OBS is open. To uninstall, use **Settings → Apps → Installed apps → OBS Selective Recording**. Your settings are kept in case you reinstall.
 
+The installer can also install **Aitum Vertical Canvas** for dual output. It's offered only if you don't already have that version or newer. If Vertical is already in OBS's own plugin folder, the installer leaves it alone; update that copy with [Aitum's installer](https://github.com/Aitum/obs-vertical-canvas/releases). Vertical stays installed if you later remove Selective Recording.
+
 ### ZIP (manual or portable OBS)
 
 Extract `obs-selective-recording-<version>-windows-x64.zip` into `C:\ProgramData\obs-studio\plugins\`, so the DLL ends up at `...\plugins\obs-selective-recording\bin\64bit\obs-selective-recording.dll`.
@@ -94,5 +96,7 @@ The [user guide](docs/USER-GUIDE.md) covers everything else.
 ## License
 
 Licensed under the [GNU General Public License v2.0 or later](LICENSE), the same license as OBS Studio.
+
+The Windows installer includes an unmodified copy of [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas) by Aitum, licensed under GPL-2.0. Its source code is published next to the installer on each release (`…-vertical-canvas-<version>-source.tar.xz`), and the version is pinned in [packaging/windows/bundled-vertical-canvas.json](packaging/windows/bundled-vertical-canvas.json).
 
 This project is not affiliated with the OBS Project, Streamlabs or Aitum.
