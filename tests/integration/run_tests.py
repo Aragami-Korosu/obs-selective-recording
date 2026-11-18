@@ -381,6 +381,71 @@ def test_studio_mode(h):
     time.sleep(1)
 
 
+def test_placements(h):
+    """The Sources-list buttons, through SetItemRoute: one setting per placement, as in Streamlabs."""
+    print("Placement routes (Streamlabs-style buttons)")
+    obs = h.obs
+    obs.call("CreateScene", {"sceneName": "SR Placement"}, allow_fail=True)
+    h.color("SR Box Place", CYAN, 300, 300)
+    h.add("SR Placement", "SR BG Red", 0, 0)
+    stream_only = h.add("SR Placement", "SR Box Place", 100, 100)
+    recording_only = h.add("SR Placement", "SR Box Place", 700, 100)
+    h.add("SR Placement", "SR Box Place", 1300, 100)  # left as Both
+    user_hidden = h.add("SR Placement", "SR Box Place", 100, 600, visible=False)
+    locked = h.add("SR Placement", "SR Box Place", 700, 600)
+    obs.call("SetSceneItemLocked", {"sceneName": "SR Placement", "sceneItemId": locked, "sceneItemLocked": True})
+
+    def item_route(item_id, video=None):
+        args = {"scene_name": "SR Placement", "item_id": item_id}
+        if video:
+            return obs.vendor("SetItemRoute", {**args, "video": video})
+        return obs.vendor("GetItemRoute", args)
+
+    item_route(stream_only, "stream_only")
+    item_route(recording_only, "recording_only")
+    check("recording only hides the placement in OBS", item_route(recording_only)["visible"] is False)
+    check("a locked placement can't be changed", item_route(locked, "stream_only").get("ok") is False)
+    obs.call("SetCurrentProgramScene", {"sceneName": "SR Placement"})
+    time.sleep(1)
+
+    path = h.record("main", 3)
+    check("stream-only placement left out of the recording", media.pixel(path, 1.5, 250, 250) == "red",
+          media.pixel(path, 1.5, 250, 250))
+    check("recording-only placement recorded", media.pixel(path, 1.5, 850, 250) == "cyan",
+          media.pixel(path, 1.5, 850, 250))
+    check("same source, other placement still recorded", media.pixel(path, 1.5, 1450, 250) == "cyan",
+          media.pixel(path, 1.5, 1450, 250))
+    check("live: stream-only placement on stream", h.live_color("SR Placement", 250, 250) == "cyan")
+    check("live: recording-only placement off stream", h.live_color("SR Placement", 850, 250) == "red")
+
+    # Studio Mode puts a private duplicate of the scene on air; placements must still apply.
+    obs.call("SetCurrentProgramScene", {"sceneName": "SR Test B"})
+    obs.call("SetStudioModeEnabled", {"studioModeEnabled": True})
+    time.sleep(1)
+    obs.call("SetCurrentPreviewScene", {"sceneName": "SR Placement"})
+    wait_for(lambda: obs.call("GetCurrentPreviewScene")["sceneName"] == "SR Placement", 5)
+    time.sleep(1)
+    obs.call("TriggerStudioModeTransition")
+    on_air = wait_for(lambda: obs.call("GetCurrentProgramScene")["sceneName"] == "SR Placement", 10)
+    check("Studio Mode: placement scene on air", on_air)
+    time.sleep(1.5)
+    path = h.record("main", 3)
+    check("Studio Mode: stream-only placement left out", media.pixel(path, 1.5, 250, 250) == "red",
+          media.pixel(path, 1.5, 250, 250))
+    check("Studio Mode: recording-only placement recorded", media.pixel(path, 1.5, 850, 250) == "cyan",
+          media.pixel(path, 1.5, 850, 250))
+    obs.call("SetStudioModeEnabled", {"studioModeEnabled": False})
+
+    item_route(recording_only, "both")
+    check("back to Both shows the placement again", item_route(recording_only)["visible"] is True)
+    item_route(user_hidden, "recording_only")
+    item_route(user_hidden, "both")
+    check("a placement you hid yourself stays hidden", item_route(user_hidden)["visible"] is False)
+    item_route(stream_only, "both")
+    obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+    time.sleep(1)
+
+
 def test_transition_blend(h):
     print("Animated transitions are mirrored")
     h.obs.call("SetCurrentSceneTransition", {"transitionName": "Fade"}, allow_fail=True)
@@ -669,7 +734,8 @@ def main():
     h = Harness(connect(args.url), args.workdir)
 
     tests = [test_discovery, setup, test_main_recording, test_gain, test_warnings, test_vertical,
-             test_failure_isolation, test_pause, test_groups, test_studio_mode, test_transition_blend,
+             test_failure_isolation, test_pause, test_groups, test_studio_mode, test_placements,
+             test_transition_blend,
              test_source_removed, test_hotkey, test_av_sync, test_performance, test_live_stream, test_disabled,
              test_collection_switch]
     for test in tests:

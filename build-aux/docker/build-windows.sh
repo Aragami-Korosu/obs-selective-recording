@@ -104,8 +104,13 @@ XWIN=$WORK/xwin
 tar -xzf "$XWIN_TGZ" -C "$WORK"
 mkdir -p "$CACHE/xwin-dl" "$WORK/xwin-cache/dl"
 cp -r "$CACHE/xwin-dl/." "$WORK/xwin-cache/dl/"
-"$WORK/xwin-$XWIN_VERSION-x86_64-unknown-linux-musl/xwin" --accept-license --log-level warn \
-  --cache-dir "$WORK/xwin-cache" splat --output "$XWIN"
+# xwin unpacks in parallel and occasionally trips over its own files ("File exists"); retry once.
+splat() {
+  rm -rf "$XWIN" "$WORK/xwin-cache/unpack"
+  "$WORK/xwin-$XWIN_VERSION-x86_64-unknown-linux-musl/xwin" --accept-license --log-level warn \
+    --cache-dir "$WORK/xwin-cache" splat --output "$XWIN"
+}
+splat || splat
 cp -rn "$WORK/xwin-cache/dl/." "$CACHE/xwin-dl/"
 
 step "Preparing OBS and Qt"

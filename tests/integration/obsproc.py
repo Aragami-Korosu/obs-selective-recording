@@ -13,27 +13,81 @@ WM_CLOSE = 0x0010
 
 
 class ObsProcess:
+    # Some third-party services watch for processes named obs64.exe and take them over: the
+    # Streamlabs plugin's sl-browser-service injects its plugin and restarts OBS without
+    # --portable. A copy of obs64.exe under this name in the test OBS avoids that.
+    TEST_EXE = "obs64-sr-test.exe"
+
     def __init__(self, obs_dir):
         self.obs_dir = obs_dir
         self.bin = os.path.join(obs_dir, "bin", "64bit")
+        renamed = os.path.join(self.bin, self.TEST_EXE)
+        self.exe = renamed if os.path.exists(renamed) else os.path.join(self.bin, "obs64.exe")
         self.proc = None
 
+    def _pids_from_this_folder(self):
+        """PIDs of every OBS running from this OBS folder, including ones the runner didn't start."""
+        kernel32 = ctypes.windll.kernel32
+        psapi = ctypes.windll.psapi
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        exes = {os.path.normcase(os.path.abspath(os.path.join(self.bin, name))) for name in ("obs64.exe", self.TEST_EXE)}
+        pids = (wintypes.DWORD * 4096)()
+        needed = wintypes.DWORD()
+        psapi.EnumProcesses(ctypes.byref(pids), ctypes.sizeof(pids), ctypes.byref(needed))
+        found = []
+        for pid in pids[:needed.value // ctypes.sizeof(wintypes.DWORD)]:
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                continue
+            path = ctypes.create_unicode_buffer(1024)
+            size = wintypes.DWORD(len(path))
+            if kernel32.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(size)):
+                if os.path.normcase(path.value) in exes:
+                    found.append(pid)
+            kernel32.CloseHandle(handle)
+        return found
+
+    def _close_strays(self):
+        """Closes other OBS instances using this folder; two would share its config and port.
+
+        A plugin with a watchdog, such as Streamlabs' (sl-browser-service), restarts an OBS that
+        exits uncleanly, and without --portable, so such a copy loads every ProgramData plugin.
+        It's closed the way a user would, so the watchdog doesn't start it again.
+        """
+        strays = [pid for pid in self._pids_from_this_folder() if not self.proc or pid != self.proc.pid]
+        if not strays:
+            return
+        print(f"  closing other OBS instances running from {self.obs_dir}: {strays}", flush=True)
+        for pid in strays:
+            hwnd = self._main_window(pid)
+            if hwnd:
+                user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+        deadline = time.time() + 30
+        while time.time() < deadline and any(p in self._pids_from_this_folder() for p in strays):
+            time.sleep(0.5)
+        left = [p for p in strays if p in self._pids_from_this_folder()]
+        if left:
+            raise RuntimeError(f"another OBS is running from the test folder (PID {left}) and didn't close; "
+                               "close it, then run the tests again")
+
     def start(self):
+        self._close_strays()
         self.proc = subprocess.Popen(
-            [os.path.join(self.bin, "obs64.exe"), "--portable", "--multi", "--disable-shutdown-check",
+            [self.exe, "--portable", "--multi", "--disable-shutdown-check",
              "--disable-updater"],
             cwd=self.bin)
         return self.proc.pid
 
-    def windows(self):
-        """(hwnd, title) for each visible top-level window of the test OBS."""
+    def windows(self, pid=None):
+        """(hwnd, title) for each visible top-level window of the test OBS (or another PID)."""
         found = []
+        pid_wanted = pid or self.proc.pid
 
         @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
         def callback(hwnd, _):
             pid = wintypes.DWORD()
             user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-            if pid.value == self.proc.pid and user32.IsWindowVisible(hwnd):
+            if pid.value == pid_wanted and user32.IsWindowVisible(hwnd):
                 title = ctypes.create_unicode_buffer(256)
                 user32.GetWindowTextW(hwnd, title, 256)
                 found.append((hwnd, title.value))
@@ -42,9 +96,9 @@ class ObsProcess:
         user32.EnumWindows(callback, 0)
         return found
 
-    def _main_window(self):
+    def _main_window(self, pid=None):
         """OBS's main window; floating docks are separate windows and must not be closed."""
-        found = [hwnd for hwnd, title in self.windows() if title.startswith("OBS ")]
+        found = [hwnd for hwnd, title in self.windows(pid) if title.startswith("OBS ")]
         return found[0] if found else None
 
     def close(self, timeout=30):

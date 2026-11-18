@@ -65,5 +65,10 @@ python soak.py --obs-dir C:\scratch\obs-portable --workdir C:\scratch\sr-tests -
 
 ## Notes
 
-- The tests start, kill and restart the test OBS. They never touch any other OBS.
+- The tests start, kill and restart the test OBS, always with `--portable`, so it never loads plugins installed in ProgramData. They never touch any other OBS.
+- Before starting, the runner closes any other OBS running from the test folder, because two instances would share its settings and websocket port.
+- **If the Streamlabs plugin is installed on your main OBS**, its `sl-browser-service` watches for processes named `obs64.exe`. It installs its plugin into the test OBS (`plugins\sl-browser-plugin`, plus `sl-browser*.exe` in `core\obs-browser`) and restarts it without `--portable`, so the tests end up driving a different OBS. To prevent that:
+  1. Copy `bin\64bit\obs64.exe` to `bin\64bit\obs64-sr-test.exe` in the test copy. The runner uses that name when it exists, and the service ignores it.
+  2. Rename or remove `obs64.exe` in the test copy, so the service has nothing to restart.
+  3. Remove or rename anything it already added. Its plugin folder is created with administrator rights, so rename `plugins` if you can't delete it.
 - If OBS hangs on exit, the runner makes it crash on purpose, so OBS's crash handler writes every thread's stack to `config\obs-studio\crashes`. The path is printed.

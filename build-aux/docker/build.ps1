@@ -56,6 +56,7 @@ try {
 }
 
 if ($Code -ne 0) {
-	Write-Error "Build failed (exit code $Code)"
+	Write-Host "Build failed (exit code $Code)" -ForegroundColor Red
+	exit $Code
 }
 Write-Host "Results: $(Join-Path $Output 'release')"
