@@ -6,6 +6,7 @@
 #include "core/controller.hpp"
 #include "core/obs-utils.hpp"
 #include "core/pipeline.hpp"
+#include "core/placement.hpp"
 
 #include <obs-websocket-api.h>
 #include <plugin-support.h>
@@ -210,6 +211,65 @@ void get_routes(obs_data_t *request, obs_data_t *response, void *)
 	});
 }
 
+// A placement, by scene_uuid (any canvas, or a group) or scene_name (main canvas), and item_id.
+OBSSceneItem find_item(obs_data_t *request)
+{
+	OBSSourceAutoRelease scene_source;
+	const char *uuid = obs_data_get_string(request, "scene_uuid");
+	const char *name = obs_data_get_string(request, "scene_name");
+	if (uuid && *uuid)
+		scene_source = obs_get_source_by_uuid(uuid);
+	else if (name && *name)
+		scene_source = obs_get_source_by_name(name);
+	obs_scene_t *scene = obs_group_or_scene_from_source(scene_source);
+	if (!scene)
+		return nullptr;
+	return obs_scene_find_sceneitem_by_id(scene, obs_data_get_int(request, "item_id"));
+}
+
+std::string canvas_arg(obs_data_t *request)
+{
+	const char *canvas = obs_data_get_string(request, "canvas");
+	return canvas && *canvas ? canvas : kMainCanvasKey;
+}
+
+// Works exactly like clicking a Sources-list button: Recording only also hides the placement in
+// OBS so it leaves the stream.
+void set_item_route(obs_data_t *request, obs_data_t *response, void *)
+{
+	on_ui(request, response, [](Controller &c, obs_data_t *req, obs_data_t *res) {
+		OBSSceneItem item = find_item(req);
+		if (!item) {
+			obs_data_set_string(res, "error", "Unknown scene item.");
+			return;
+		}
+		const char *video = obs_data_get_string(req, "video");
+		if (!video || !*video) {
+			obs_data_set_string(res, "error", "Missing video route.");
+			return;
+		}
+		const bool ok = set_placement_route(c, canvas_arg(req), item, route_from_string(video));
+		if (!ok)
+			obs_data_set_string(res, "error", "The source is locked.");
+		obs_data_set_bool(res, "ok", ok);
+	});
+}
+
+void get_item_route(obs_data_t *request, obs_data_t *response, void *)
+{
+	on_ui(request, response, [](Controller &c, obs_data_t *req, obs_data_t *res) {
+		OBSSceneItem item = find_item(req);
+		if (!item) {
+			obs_data_set_string(res, "error", "Unknown scene item.");
+			return;
+		}
+		const PlacementRoute route = placement_route(c, canvas_arg(req), item);
+		obs_data_set_string(res, "video", route_to_string(route.route));
+		obs_data_set_bool(res, "locked", route.locked);
+		obs_data_set_bool(res, "visible", obs_sceneitem_visible(item));
+	});
+}
+
 void set_canvas_settings(obs_data_t *request, obs_data_t *response, void *)
 {
 	on_ui(request, response, [](Controller &c, obs_data_t *req, obs_data_t *res) {
@@ -314,6 +374,8 @@ const Request kRequests[] = {
 	{"GetInterruptedRecordings", get_interrupted},
 	{"SetRoute", set_route},
 	{"GetRoute", get_routes},
+	{"SetItemRoute", set_item_route},
+	{"GetItemRoute", get_item_route},
 	{"GetWarnings", get_warnings},
 };
 

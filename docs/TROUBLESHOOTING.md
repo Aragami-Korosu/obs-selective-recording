@@ -15,9 +15,10 @@ If that line is missing, check that:
 - Your OBS is 31.1 or newer.
 - The plugin isn't turned off in **Tools → Plugin Manager** (OBS 32 and newer).
 
-## A source I set to "Rec only" or "Off" still shows on stream
+## A source I set to "Recording only" or "Off" still shows on stream
 
-That's by design. The plugin never changes your stream ([ADR-0003](adr/0003-stream-exclusion.md)). Hide the source in OBS (the eye icon), and for audio, untick the stream's track in **Edit → Advanced Audio Properties**. The ⚠ in the dock tells you exactly what's still live.
+- **Set with a Sources-list button (or the dock's simple view):** Recording only hides that placement in OBS for you. If it's back on stream, its eye icon was turned on again. Click the button through to Recording only again, or turn the eye off.
+- **Set in the dock's Advanced view:** routes there never change OBS ([ADR-0003](adr/0003-stream-exclusion.md)). Hide the source in OBS (the eye icon), and for audio, untick the stream's track in **Edit → Advanced Audio Properties**. The ⚠ in the dock tells you exactly what's still live.
 
 ## The Aitum Vertical tab doesn't appear
 

@@ -52,7 +52,7 @@ private:
 		QTreeWidgetItem *tree_item = nullptr;
 		RouteButton *video = nullptr;
 		RouteButton *audio = nullptr;
-		QToolButton *combined = nullptr;
+		QToolButton *placement = nullptr; // simple view
 		QLabel *warning = nullptr;
 	};
 
@@ -61,7 +61,7 @@ private:
 	void add_simple_items(QTreeWidgetItem *parent, obs_scene_t *scene, const std::string &scene_name);
 	void add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sceneitem_t *item,
 			    const std::string &scene_name);
-	void show_combined_menu(const Row &row, const QPoint &pos);
+	void show_placement_menu(const Row &row, const QPoint &pos);
 	void set_simple(bool simple);
 	OBSSource current_scene() const;
 	void add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, const std::string &scene_name);

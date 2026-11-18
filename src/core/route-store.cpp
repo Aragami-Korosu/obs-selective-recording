@@ -35,6 +35,26 @@ std::string scene_uuid_of(obs_sceneitem_t *item)
 	return uuid ? uuid : "";
 }
 
+// Placement routes are keyed by scene UUID and item ID. Studio Mode's "Duplicate Scene" puts a
+// private copy of a scene on air whose items have new IDs, but libobs copies each item's private
+// settings into the copy. So a placement with a route carries its key in its private settings,
+// and the copy's items find the original's route through it.
+constexpr const char *kPlacementKey = "selective_recording_placement";
+
+std::string stamped_key(obs_sceneitem_t *item)
+{
+	OBSDataAutoRelease data = obs_sceneitem_get_private_settings(item);
+	const char *key = obs_data_get_string(data, kPlacementKey);
+	return key ? key : "";
+}
+
+void stamp_key(obs_sceneitem_t *item, const std::string &key)
+{
+	OBSDataAutoRelease data = obs_sceneitem_get_private_settings(item);
+	const char *current = obs_data_get_string(data, kPlacementKey);
+	if (!current || key != current)
+		obs_data_set_string(data, kPlacementKey, key.c_str());
+}
 } // namespace
 
 RouteStore::RouteStore()
@@ -189,10 +209,20 @@ ResolvedRoute RouteStore::resolve_video(const std::string &canvas, obs_source_t 
 {
 	const RouteProfile &profile = active();
 
-	if (item) {
-		auto it = profile.item_video.find(item_key(scene_uuid_of(item).c_str(), obs_sceneitem_get_id(item)));
-		if (it != profile.item_video.end())
+	if (item && !profile.item_video.empty()) {
+		const std::string key = item_key(scene_uuid_of(item).c_str(), obs_sceneitem_get_id(item));
+		auto it = profile.item_video.find(key);
+		if (it != profile.item_video.end()) {
+			// Make sure a copy of this placement (Studio Mode) can find its route.
+			stamp_key(item, key);
 			return {it->second, RouteOrigin::Item};
+		}
+		const std::string stamped = stamped_key(item);
+		if (!stamped.empty() && stamped != key) {
+			it = profile.item_video.find(stamped);
+			if (it != profile.item_video.end())
+				return {it->second, RouteOrigin::Item};
+		}
 	}
 
 	const char *uuid = source ? obs_source_get_uuid(source) : nullptr;
@@ -267,9 +297,10 @@ void RouteStore::set_item_video(obs_sceneitem_t *item, std::optional<Route> rout
 		return;
 	const std::string key = item_key(scene_uuid_of(item).c_str(), obs_sceneitem_get_id(item));
 	auto &items = profiles_[active_].item_video;
-	if (route)
+	if (route) {
 		items[key] = *route;
-	else
+		stamp_key(item, key);
+	} else
 		items.erase(key);
 	changed();
 }

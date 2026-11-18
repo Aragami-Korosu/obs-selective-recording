@@ -18,7 +18,7 @@ First release.
 - A fallback to x264 when a hardware encoder can't start.
 - Each canvas handles its own failures, with clear messages. A failure never affects another canvas or a stream.
 - Warnings when a source meant to stay off the stream is still visible live or still on the stream's audio track, including tracks shared between two streams.
-- Streamlabs-style buttons on each source in OBS's Sources list and Aitum Vertical's Vertical Sources dock, cycling Both, Stream and Recording. They can be turned off.
+- Streamlabs-style buttons on each source in OBS's Sources list and Aitum Vertical's Vertical Sources dock. Like Streamlabs, each one sets that placement (Both → Stream only → Recording only), Recording only takes the placement off the stream by hiding it in OBS, and locked sources can't be changed. They can be turned off.
 - A dock with a tab for each canvas. The simple view (the default) shows the current scene with one button per source. The Advanced view has separate video and audio controls, per-canvas and per-placement routes, search, filters and bulk changes. Also: profiles (with import and export), preview, pause and resume, status, and an open-folder link. The dock opens on first run.
 - Hotkeys for each canvas, plus start/stop all.
 - Crash recovery: interrupted recordings are listed at the next start.
@@ -29,4 +29,4 @@ First release.
 
 ### Never changed
 
-- Live scenes, streams and other plugins' outputs are never modified ([ADR-0003](docs/adr/0003-stream-exclusion.md)).
+- Streams and other plugins' outputs are never modified ([ADR-0003](docs/adr/0003-stream-exclusion.md)). Live scenes change only when you choose Recording only on a Sources-list button, which hides that placement in OBS ([ADR-0008](docs/adr/0008-streamlabs-style-placements.md)).

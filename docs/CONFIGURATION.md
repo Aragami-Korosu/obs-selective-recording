@@ -51,7 +51,17 @@ The plugin config folder is `%APPDATA%\obs-studio\plugin_config\obs-selective-re
 | `recording_only` | Included, even when hidden live | You hide it; the plugin warns if it's still live |
 | `off` | Excluded | You hide it; the plugin warns if it's still live |
 
-A route never changes OBS ([ADR-0003](adr/0003-stream-exclusion.md)). Any unknown value is treated as `both`.
+Setting a route in the dock's Advanced view or with `SetRoute` never changes OBS ([ADR-0003](adr/0003-stream-exclusion.md)). Any unknown value is treated as `both`.
+
+### Where the Streamlabs-style buttons save
+
+The Sources-list buttons, the dock's simple view and `SetItemRoute` save to `item_overrides`, one entry per placement (`"<scene-uuid>/<item-id>"`). An entry is only kept where the placement differs from what its source would get anyway. To find the key, take the scene's `"uuid"` in the collection file, then the item's `"id"` from that scene's `"settings"` → `"items"`. For a source inside a group, use the group's `"uuid"`.
+
+Choosing Recording only also hides the scene item in OBS ([ADR-0008](adr/0008-streamlabs-style-placements.md)). The plugin marks it with `"selective_recording_hidden": true` in the item's `"private_settings"`, so it only ever shows items again that it hid itself.
+
+A placement with a route also gets `"selective_recording_placement": "<scene-uuid>/<item-id>"` in its `"private_settings"`. OBS copies private settings when it duplicates a scene (including Studio Mode's on-air copy), so the copy uses the original's setting until it's given its own.
+
+Edit the collection file only while OBS is closed: OBS rewrites it when it saves and when it exits.
 
 ### Resolution order
 

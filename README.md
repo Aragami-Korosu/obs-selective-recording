@@ -13,7 +13,7 @@ Most streamers want their recording to be a little different from what goes live
 | **Rec only** | ✅ | Hide it in OBS. The plugin warns you if it's still live. |
 | **Off** | — | Hide it in OBS. The plugin warns you if it's still live. |
 
-> **Your stream is never touched.** The plugin only controls its own recordings. It never hides, mutes or changes anything in your live scenes, your streams or other plugins' outputs, so a recording problem can't change what your viewers see.
+> **Recording only works like Streamlabs.** Click a source's button to **Recording only** and the plugin hides it in OBS, so it leaves your stream, while your recording keeps it. That one click is the only time the plugin changes your live scene. Otherwise it only controls its own recordings: it never changes your streams' outputs, audio tracks or other plugins' outputs, and a recording problem can't change what your viewers see.
 
 ### Works with dual output
 
@@ -62,20 +62,19 @@ For a portable OBS, copy `bin\64bit\*` into OBS's `obs-plugins\64bit` folder and
 
 ## Quick start
 
-Like Streamlabs, every source in OBS's **Sources** list gets a small button next to its eye icon:
+Just like Streamlabs, every source in OBS's **Sources** list (and Aitum Vertical's) gets a button next to its eye icon:
 
 | Symbol | Meaning |
 | --- | --- |
-| Blue radio waves around a red dot | **Both**: stream and recording |
-| Blue radio waves (broadcast) | **Stream**: left out of the recording |
-| Red record button | **Recording**: in the recording only (hide it in OBS to keep it off the stream) |
-| Grey slashed circle | **Off** |
+| Blue radio waves around a red dot | **Visible on both Stream and Recording** |
+| Blue radio waves (broadcast) | **Only visible on Stream** |
+| Red record button | **Only visible on Recording** |
 
-1. Click the button next to your alerts or chat overlay until it shows the **broadcast** symbol. It's now left out of the recording.
-2. To record a source that isn't on stream, click until it shows the **record** symbol, then hide it with the eye icon.
+1. Click the button next to your alerts or chat overlay until it shows the **broadcast** symbol. It stays on stream and is left out of the recording.
+2. Click a source until it shows the **record** symbol to keep it off the stream but in the recording. The plugin hides it in OBS for you.
 3. In the **Selective Recording** dock, click **Start recording**, or **Start all recordings** to record every canvas.
 
-Right-click a button for **Off** and more. The dock shows the same buttons for the current scene, plus a tab for Aitum Vertical. Its **Advanced** view has separate video and audio controls and per-canvas options.
+Each button sets that one placement (the source in that scene), like Streamlabs. The dock shows the same buttons for the current scene, plus a tab for Aitum Vertical. Its **Advanced** view adds separate audio control, per-canvas settings and **Off**.
 
 The [user guide](docs/USER-GUIDE.md) covers everything else.
 

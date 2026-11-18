@@ -287,8 +287,7 @@ void SourceListButtons::sync_list(QAbstractItemView *list, const std::string &ca
 			connect(button, &QToolButton::clicked, this, [this, button]() {
 				OBSSceneItem target = item_for(button);
 				if (target)
-					cycle_combined_route(controller_, canvas_key_of(button),
-							     obs_sceneitem_get_source(target), target);
+					cycle_placement_route(controller_, canvas_key_of(button), target);
 			});
 			connect(button, &QWidget::customContextMenuRequested, this,
 				[this, button](const QPoint &pos) { show_menu(button, button->mapToGlobal(pos)); });
@@ -300,10 +299,12 @@ void SourceListButtons::sync_list(QAbstractItemView *list, const std::string &ca
 		button->setProperty("itemId", (qlonglong)obs_sceneitem_get_id(item));
 		button->setProperty("canvasKey", QByteArray::fromStdString(canvas_key));
 
-		const CombinedRoute route = combined_route(controller_, canvas_key, source, item);
-		button->setIcon(route_icon(route.route, route.mixed));
+		// Like Streamlabs, a locked source's button can't be changed.
+		const PlacementRoute route = placement_route(controller_, canvas_key, item);
+		button->setIcon(route_icon(route.route));
+		button->setEnabled(!route.locked);
 		button->setToolTip(QString::fromUtf8(obs_module_text("PluginName")) + QStringLiteral(": ") +
-				   combined_label(route) + QStringLiteral("\n") + combined_tooltip(route));
+				   route_tooltip(route));
 	}
 }
 
@@ -315,14 +316,16 @@ void SourceListButtons::show_menu(QToolButton *button, const QPoint &pos)
 	obs_source_t *source = obs_sceneitem_get_source(item);
 	const std::string canvas_key = canvas_key_of(button);
 
+	const Route current = placement_route(controller_, canvas_key, item).route;
+
 	QMenu menu;
 	menu.addSection(QString::fromUtf8(obs_source_get_name(source)));
-	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		CombinedRoute shown;
-		shown.route = r;
-		menu.addAction(route_icon(r, false), combined_label(shown), this, [this, item, r, canvas_key]() {
-			set_combined_route(controller_, canvas_key, obs_sceneitem_get_source(item), item, r);
+	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly}) {
+		QAction *action = menu.addAction(route_icon(r), route_label(r), this, [this, item, r, canvas_key]() {
+			set_placement_route(controller_, canvas_key, item, r);
 		});
+		action->setCheckable(true);
+		action->setChecked(r == current);
 	}
 	menu.addSeparator();
 	menu.addAction(QString::fromUtf8(obs_module_text("Simple.OpenDock")), this, [this]() {

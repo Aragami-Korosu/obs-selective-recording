@@ -280,8 +280,12 @@ void CanvasTab::release()
 void CanvasTab::rebuild_if_changed(bool force)
 {
 	std::string sig = structure_signature();
-	if (!force && sig == signature_)
+	if (!force && sig == signature_) {
+		// Visibility and locks change without changing the structure.
+		if (simple_)
+			refresh_routes();
 		return;
+	}
 	signature_ = std::move(sig);
 	build_tree();
 }
@@ -376,9 +380,6 @@ void CanvasTab::add_simple_items(QTreeWidgetItem *parent, obs_scene_t *scene, co
 
 		const char *type = obs_source_get_display_name(obs_source_get_id(source));
 		tree_item->setToolTip(ColName, type ? QString::fromUtf8(type) : QString());
-		if (!obs_sceneitem_visible(item))
-			tree_item->setForeground(ColName, palette().brush(QPalette::Disabled, QPalette::Text));
-
 		add_simple_row(tree_item, source, item, scene_name);
 
 		if (obs_sceneitem_is_group(item)) {
@@ -400,19 +401,17 @@ void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source,
 	const size_t index = rows_.size();
 	tree_item->setData(ColName, kRowRole, (qulonglong)index);
 
-	row.combined = new QToolButton(tree_);
-	row.combined->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-	row.combined->setIconSize(QSize(16, 16));
-	row.combined->setMinimumWidth(104);
-	row.combined->setCursor(Qt::PointingHandCursor);
-	row.combined->setContextMenuPolicy(Qt::CustomContextMenu);
-	tree_->setItemWidget(tree_item, ColVideo, row.combined);
-	connect(row.combined, &QToolButton::clicked, this, [this, index]() {
-		const Row &r = rows_[index];
-		cycle_combined_route(controller_, key_, r.source, r.item);
-	});
-	connect(row.combined, &QWidget::customContextMenuRequested, this, [this, index](const QPoint &pos) {
-		show_combined_menu(rows_[index], rows_[index].combined->mapToGlobal(pos));
+	row.placement = new QToolButton(tree_);
+	row.placement->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	row.placement->setIconSize(QSize(16, 16));
+	row.placement->setMinimumWidth(120);
+	row.placement->setCursor(Qt::PointingHandCursor);
+	row.placement->setContextMenuPolicy(Qt::CustomContextMenu);
+	tree_->setItemWidget(tree_item, ColVideo, row.placement);
+	connect(row.placement, &QToolButton::clicked, this,
+		[this, index]() { cycle_placement_route(controller_, key_, rows_[index].item); });
+	connect(row.placement, &QWidget::customContextMenuRequested, this, [this, index](const QPoint &pos) {
+		show_placement_menu(rows_[index], rows_[index].placement->mapToGlobal(pos));
 	});
 
 	row.warning = new QLabel(tree_);
@@ -421,18 +420,20 @@ void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source,
 	rows_.push_back(std::move(row));
 }
 
-void CanvasTab::show_combined_menu(const Row &row, const QPoint &pos)
+void CanvasTab::show_placement_menu(const Row &row, const QPoint &pos)
 {
-	OBSSource source = row.source;
 	OBSSceneItem item = row.item;
+	const PlacementRoute current = placement_route(controller_, key_, item);
 
 	QMenu menu(this);
-	menu.addSection(QString::fromStdString(source_name(source)));
-	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		CombinedRoute shown;
-		shown.route = r;
-		menu.addAction(route_icon(r, false), combined_label(shown), this,
-			       [this, source, item, r]() { set_combined_route(controller_, key_, source, item, r); });
+	menu.addSection(QString::fromStdString(source_name(row.source)));
+	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly}) {
+		QAction *action = menu.addAction(route_icon(r), route_label(r), this, [this, item, r]() {
+			set_placement_route(controller_, key_, item, r);
+		});
+		action->setCheckable(true);
+		action->setChecked(r == current.route);
+		action->setEnabled(!current.locked);
 	}
 	menu.addSeparator();
 	menu.addAction(text("Simple.Advanced"), this, [this]() { mode_button_->setChecked(true); });
@@ -507,11 +508,15 @@ void CanvasTab::refresh_routes()
 			row.video->set_route(routes.resolve_video(key_, row.source, row.item));
 		if (row.audio)
 			row.audio->set_route(routes.resolve_audio(key_, row.source));
-		if (row.combined) {
-			const CombinedRoute route = combined_route(controller_, key_, row.source, row.item);
-			row.combined->setIcon(route_icon(route.route, route.mixed));
-			row.combined->setText(combined_label(route));
-			row.combined->setToolTip(combined_tooltip(route));
+		if (row.placement) {
+			const PlacementRoute route = placement_route(controller_, key_, row.item);
+			row.placement->setIcon(route_icon(route.route));
+			row.placement->setText(route_label(route.route));
+			row.placement->setToolTip(route_tooltip(route));
+			row.placement->setEnabled(!route.locked);
+			const QPalette::ColorGroup group = obs_sceneitem_visible(row.item) ? QPalette::Active
+											   : QPalette::Disabled;
+			row.tree_item->setForeground(ColName, palette().brush(group, QPalette::Text));
 		}
 	}
 	apply_filter();
@@ -761,33 +766,38 @@ void CanvasTab::show_audio_menu(const Row &row, const QPoint &pos)
 void CanvasTab::show_tree_menu(const QPoint &pos)
 {
 	std::vector<OBSSource> selected;
+	std::vector<OBSSceneItem> selected_items;
 	for (QTreeWidgetItem *item : tree_->selectedItems()) {
 		const QVariant index = item->data(ColName, kRowRole);
 		if (!index.isValid())
 			continue;
 		const size_t i = (size_t)index.toULongLong();
-		if (i < rows_.size() && !contains_source(selected, rows_[i].source))
+		if (i >= rows_.size())
+			continue;
+		if (!contains_source(selected, rows_[i].source))
 			selected.push_back(rows_[i].source);
+		if (rows_[i].item)
+			selected_items.push_back(rows_[i].item);
 	}
 	if (selected.empty())
 		return;
 
 	RouteStore &routes = controller_.routes();
 	QMenu menu(this);
-	menu.addSection(text("Menu.Selected").arg(selected.size()));
 
 	if (simple_) {
-		for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-			CombinedRoute shown;
-			shown.route = r;
-			menu.addAction(route_icon(r, false), combined_label(shown), this, [this, selected, r]() {
-				for (auto &s : selected)
-					set_combined_route(controller_, key_, s, nullptr, r);
+		menu.addSection(text("Menu.Selected").arg(selected_items.size()));
+		for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly}) {
+			menu.addAction(route_icon(r), route_label(r), this, [this, selected_items, r]() {
+				for (auto &item : selected_items)
+					set_placement_route(controller_, key_, item, r);
 			});
 		}
 		menu.exec(tree_->viewport()->mapToGlobal(pos));
 		return;
 	}
+
+	menu.addSection(text("Menu.Selected").arg(selected.size()));
 
 	QMenu *video = menu.addMenu(text("Dock.Video"));
 	QMenu *audio = menu.addMenu(text("Dock.Audio"));
@@ -835,8 +845,8 @@ void CanvasTab::apply_filter()
 
 		Route video = row.video ? row.video->route() : Route::Both;
 		Route audio = row.audio ? row.audio->route() : Route::Both;
-		if (row.combined) {
-			video = audio = combined_route(controller_, key_, row.source, row.item).route;
+		if (row.placement) {
+			video = audio = placement_route(controller_, key_, row.item).route;
 			if (mode == FilterExcluded)
 				return !in_recording(video);
 		}

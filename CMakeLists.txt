@@ -57,6 +57,8 @@ target_sources(
     src/core/obs-utils.hpp
     src/core/pipeline.cpp
     src/core/pipeline.hpp
+    src/core/placement.cpp
+    src/core/placement.hpp
     src/core/route-store.cpp
     src/core/route-store.hpp
     src/core/routes.cpp

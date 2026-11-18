@@ -1,6 +1,6 @@
 # 0003. Preserve the live composition; stream exclusion is user-managed
 
-- **Status:** Accepted
+- **Status:** Accepted, amended by [0008](0008-streamlabs-style-placements.md) (the Streamlabs-style buttons hide a Recording only placement in OBS)
 - **Date:** 2026-11-17
 
 ## Context

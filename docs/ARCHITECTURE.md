@@ -171,7 +171,12 @@ Encoder presets:
 - It only touches a row when the row count matches and the row's label shows that source's name.
 - It inserts a `QToolButton` into the row's layout, before the visibility checkbox. OBS recreates rows often, so missing buttons are simply added again.
 - A button stores only the scene UUID and item ID, and resolves the item when clicked.
-- Clicking changes routes only, never OBS state. If OBS's list changes in a future version, the buttons stop appearing and nothing else breaks.
+- If OBS's list changes in a future version, the buttons stop appearing and nothing else breaks.
+
+A click goes through `core/placement` ([ADR-0008](adr/0008-streamlabs-style-placements.md)), which is shared with the dock's simple view and `SetItemRoute`:
+- It sets the placement's video as an item override, kept only where it differs from what the source inherits.
+- For Recording only it also hides the scene item, marking it in the item's private settings, and it shows the item again later only if that mark is there.
+- Each placement with a route carries its key in its scene item's private settings. libobs copies private settings into Studio Mode's duplicate, so the copy OBS puts on air finds the original's route without the plugin searching scenes (an earlier position-matching approach enumerated scenes that OBS could be destroying, and crashed).
 
 Other canvases' Sources lists get the same buttons. Aitum Vertical's "Vertical Sources" dock uses its own copy of OBS's `SourceTree` class with the same row layout and order, but the plugin can't ask it which scene it shows. So every 2 s it looks for `SourceTree` views other than `sources`, and identifies each one by its rows: it tries every extra canvas's on-air scene (both sides of a running transition), then the canvas's other scenes, and uses the first whose items match the rows. Those buttons store their canvas key, so the route is read and set on that canvas.
 
@@ -200,9 +205,10 @@ Signal handlers hand work to the UI thread together with a weak "alive" token. W
 
 - Every OBS object the plugin holds uses the RAII wrappers in `obs.hpp`.
 - Private scenes are removed from the private canvas before they're released.
+- **The private canvas outlives its scenes.** A scene made in a canvas keeps a pointer to the canvas's lock even after it's removed from the canvas, and libobs destroys released scenes later on its task thread. So `~SceneMirror` releases the scenes, waits for libobs's destroy queue (`obs_wait_for_destroy_queue`), and only then releases the canvas. Releasing the canvas first caused an intermittent crash in `obs_source_destroy_defer`. If a scene is somehow still alive after the wait, the canvas is deliberately leaked rather than freed under it.
 - The preview holds its canvas reference under a mutex while it draws, so the last release always happens on the UI thread.
 - Integration tests check that OBS reports `Number of memory leaks: 0` after a long session that ends with recordings still running.
 
 ## Portability
 
-Engine code uses only libobs and the frontend API. Qt appears in the engine only to post work to the UI thread. Every CI build compiles on Windows, macOS and Ubuntu. Runtime testing has been done on Windows only.
+Engine code uses only libobs and the frontend API. Qt appears in the engine only to post work to the UI thread. The CI workflows (currently disabled) compile on Windows, macOS and Ubuntu; the Docker build covers Windows. Runtime testing has been done on Windows only.
