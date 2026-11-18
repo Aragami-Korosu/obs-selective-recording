@@ -1,5 +1,26 @@
 # Building from Source
 
+## Build in Docker (no Visual Studio needed)
+
+[build-aux/docker/build.ps1](../build-aux/docker/build.ps1) builds the Windows plugin and installer in a throwaway Linux container. You only need Docker (Linux containers).
+
+```powershell
+build-aux\docker\build.ps1                                   # unsigned
+build-aux\docker\build.ps1 -Signing C:\path\to\signing-folder  # signed (signing.pfx + pfx-password.txt)
+```
+
+The container:
+1. checks formatting (clang-format 19, gersemi);
+2. cross-compiles the plugin with clang-cl and lld-link against the pinned OBS 31.1.1 headers and obs-deps Qt 6 from [`buildspec.json`](../buildspec.json), with warnings treated as errors;
+3. packages the ZIP and builds the installer with Inno Setup under Wine, signing with osslsigncode when `-Signing` is given;
+4. installs and uninstalls the installer in a clean Wine prefix, to check that both the plugin and Aitum Vertical Canvas are installed and that only the plugin is removed.
+
+Results go to `release\`. Downloads are cached in `.deps\docker` (about 3 GB). Every download is pinned by SHA-256, except the MSVC runtime and Windows SDK, which [xwin](https://github.com/Jake-Shadle/xwin) fetches from Microsoft. **Running the build accepts Microsoft's license for those files.**
+
+The container is removed when it finishes and uses only bind mounts, so no Docker volumes are left behind. The `debian:trixie` image is removed afterwards too, unless it was already on your machine or you pass `-KeepImage`.
+
+After a build, run the [integration tests](#testing) against `release\RelWithDebInfo\obs-selective-recording`.
+
 ## Prerequisites (Windows)
 
 | Tool | Version | Notes |
@@ -102,7 +123,9 @@ Vertical installs into the sibling folder `…\plugins\vertical-canvas` and is o
 
 ### Code signing
 
-When the repository secrets `WINDOWS_SIGNING_PFX` (the `.pfx` file, base64-encoded) and `WINDOWS_SIGNING_PASSWORD` are set, CI signs the plugin DLL, the installer and its uninstaller with `signtool`, using SHA-256 and a DigiCert timestamp. Without them, builds are unsigned.
+The Docker build signs the plugin DLL, the installer and its uninstaller when you pass `-Signing` with a folder containing `signing.pfx` and `pfx-password.txt`. It uses osslsigncode with SHA-256 and a DigiCert timestamp. The folder is mounted read-only and the password is never printed. Without `-Signing`, builds are unsigned.
+
+If the GitHub workflows are re-enabled, CI signs the same files with `signtool` when the repository secrets `WINDOWS_SIGNING_PFX` (the `.pfx` file, base64-encoded) and `WINDOWS_SIGNING_PASSWORD` are set.
 
 Test builds currently use a **self-signed** "Aragami Korosu" certificate. Windows shows that name as the publisher only on machines that trust it. To trust it, run this in an administrator PowerShell:
 
@@ -125,6 +148,6 @@ Run the full suite before opening a pull request that changes video, audio or re
 
 ## Continuous integration
 
-GitHub Actions builds Windows, macOS and Ubuntu on every push and pull request, using the workflows inherited from the OBS plugin template. Warnings are errors on macOS and Ubuntu. Pushing a tag such as `1.0.0` creates a draft release with packaged builds.
+The GitHub Actions workflows from the OBS plugin template are in `.github/workflows`, but they're **disabled** for now. Builds and releases are made locally with the [Docker build](#build-in-docker-no-visual-studio-needed) and the integration tests. To turn them back on, run `gh workflow enable` for each workflow, or use the repository's **Actions** tab.
 
-The Ubuntu job installs OBS from the OBS Project's package archive. If that server is unavailable (HTTP 503), re-run the failed job.
+When enabled, they build Windows, macOS and Ubuntu on every push and pull request, with warnings as errors on macOS and Ubuntu, and pushing a tag such as `1.0.0` creates a draft release with packaged builds. The Ubuntu job installs OBS from the OBS Project's package archive; if that server is unavailable (HTTP 503), re-run the failed job.

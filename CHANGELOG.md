@@ -23,7 +23,7 @@ First release.
 - Hotkeys for each canvas, plus start/stop all.
 - Crash recovery: interrupted recordings are listed at the next start.
 - An obs-websocket vendor (`selective-recording`) for automation.
-- A Windows installer that checks the OBS version, won't run while OBS is open, and adds an uninstaller. It can also install Aitum Vertical Canvas 1.6.7 when that version or newer isn't already installed.
+- A Windows installer that checks the OBS version, won't run while OBS Studio is open (Streamlabs Desktop can stay open), and adds an uninstaller. It can also install Aitum Vertical Canvas 1.6.7 when that version or newer isn't already installed.
 - Integration tests that drive a portable OBS and check recordings pixel by pixel and by frequency, plus a soak test and an optional test on a real live stream.
 - Documentation: user guide, troubleshooting, automation API, specification, architecture, configuration, roadmap and decision records.
 

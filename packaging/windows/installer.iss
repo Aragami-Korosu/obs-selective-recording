@@ -120,16 +120,30 @@ begin
 end;
 #endif
 
+// True when OBS Studio is running. Streamlabs Desktop runs helper processes also named obs64.exe
+// (from its obs-studio-node module); they never load these plugins, so they don't count. A
+// process whose path can't be read is counted, to be safe.
 function ObsRunning(): Boolean;
 var
-  Locator, Service, Processes: Variant;
+  Locator, Service, Processes, Process: Variant;
+  I: Integer;
+  Path: String;
 begin
   Result := False;
   try
     Locator := CreateOleObject('WbemScripting.SWbemLocator');
     Service := Locator.ConnectServer('.', 'root\CIMV2');
-    Processes := Service.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE Name = ''obs64.exe''');
-    Result := Processes.Count > 0;
+    Processes := Service.ExecQuery('SELECT ExecutablePath FROM Win32_Process WHERE Name = ''obs64.exe''');
+    for I := 0 to Processes.Count - 1 do begin
+      Process := Processes.ItemIndex(I);
+      Path := '';
+      if not VarIsNull(Process.ExecutablePath) then
+        Path := Process.ExecutablePath;
+      if Pos('\obs-studio-node\', Lowercase(Path)) = 0 then begin
+        Result := True;
+        exit;
+      end;
+    end;
   except
     Result := False;
   end;

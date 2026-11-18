@@ -50,7 +50,7 @@ Streamlabs turns off Selective Recording when Dual Output is on. This plugin is 
 2. Download `obs-selective-recording-<version>-windows-x64-installer.exe` from [Releases](../../releases) and run it.
 3. Start OBS. The **Selective Recording** dock opens on first run (afterwards it's under **Docks**), and a recording button appears next to each source in the Sources list.
 
-The installer checks your OBS version and won't run while OBS is open. To uninstall, use **Settings → Apps → Installed apps → OBS Selective Recording**. Your settings are kept in case you reinstall.
+The installer checks your OBS version and won't run while OBS Studio is open (Streamlabs Desktop can stay open). To uninstall, use **Settings → Apps → Installed apps → OBS Selective Recording**. Your settings are kept in case you reinstall.
 
 The installer can also install **Aitum Vertical Canvas** for dual output. It's offered only if you don't already have that version or newer. If Vertical is already in OBS's own plugin folder, the installer leaves it alone; update that copy with [Aitum's installer](https://github.com/Aitum/obs-vertical-canvas/releases). Vertical stays installed if you later remove Selective Recording.
 
