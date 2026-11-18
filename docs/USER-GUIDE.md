@@ -15,7 +15,7 @@ Video and audio are set separately. The plugin **never changes your stream**. It
 
 ## Buttons in the Sources list
 
-Each source in OBS's **Sources** list has a round button next to its eye icon:
+Each source in OBS's **Sources** list has a round button next to its eye icon. With Aitum Vertical installed, the **Vertical Sources** dock has them too.
 
 | Symbol | Route |
 | --- | --- |
@@ -30,7 +30,7 @@ Each source in OBS's **Sources** list has a round button next to its eye icon:
 
 The buttons only change what goes into the recording. They never change OBS: the eye icon is still how you show or hide things on stream.
 
-> OBS doesn't offer plugins an official way to add buttons to its Sources list, so these attach to it directly. If a future OBS version changes that list, the buttons will simply stop appearing until the plugin is updated. The dock always works.
+> OBS doesn't offer plugins an official way to add buttons to its Sources list, so these attach to it directly. If a future version of OBS or Aitum Vertical changes that list, the buttons will simply stop appearing until the plugin is updated. The dock always works.
 
 ## The dock
 

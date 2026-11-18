@@ -21,7 +21,7 @@ Streamlabs turns off Selective Recording when Dual Output is on. This plugin is 
 
 ## Features
 
-- A Streamlabs-style button on every source in OBS's own Sources list, plus a simple dock view of the current scene
+- A Streamlabs-style button on every source in OBS's own Sources list (and Aitum Vertical's), plus a simple dock view of the current scene
 - An advanced view with every scene and separate video and audio routing
 - Routes for every canvas, for one canvas only, or for one placement of a source
 - Warnings when a source you meant to keep off the stream is still live, including audio still on the stream's track

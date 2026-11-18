@@ -173,6 +173,8 @@ Encoder presets:
 - A button stores only the scene UUID and item ID, and resolves the item when clicked.
 - Clicking changes routes only, never OBS state. If OBS's list changes in a future version, the buttons stop appearing and nothing else breaks.
 
+Other canvases' Sources lists get the same buttons. Aitum Vertical's "Vertical Sources" dock uses its own copy of OBS's `SourceTree` class with the same row layout and order, but the plugin can't ask it which scene it shows. So every 2 s it looks for `SourceTree` views other than `sources`, and identifies each one by its rows: it tries every extra canvas's on-air scene (both sides of a running transition), then the canvas's other scenes, and uses the first whose items match the rows. Those buttons store their canvas key, so the route is read and set on that canvas.
+
 ## Warnings
 
 `evaluate_warnings()` reads OBS state and changes nothing:
