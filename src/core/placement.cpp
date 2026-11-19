@@ -32,20 +32,28 @@ void set_hidden_by_plugin(obs_sceneitem_t *item, bool hidden)
 		obs_data_erase(data, kHiddenByPluginKey);
 }
 
-// As in Streamlabs, Recording only takes a placement off the stream by hiding it in OBS. Leaving
-// Recording only shows it again, but only if the plugin hid it (and not for Off, which the user
-// keeps on or off the stream themselves).
+// As in Streamlabs, Recording only takes a placement off the stream by hiding it in OBS. Moving
+// to Both or Stream only shows it again, but only if the plugin hid it. Off doesn't touch the
+// stream, so a placement the plugin hid stays hidden, and keeps its mark, until it's set back
+// to Both or Stream only (Recording only → Off → Both shows it again).
 void apply_stream_rule(obs_sceneitem_t *item, Route before, Route after)
 {
-	if (after == Route::RecordingOnly) {
+	switch (after) {
+	case Route::RecordingOnly:
 		if (before != Route::RecordingOnly && obs_sceneitem_visible(item)) {
 			set_hidden_by_plugin(item, true);
 			obs_sceneitem_set_visible(item, false);
 		}
-	} else if (before == Route::RecordingOnly && hidden_by_plugin(item)) {
-		set_hidden_by_plugin(item, false);
-		if (after != Route::Off)
+		break;
+	case Route::Both:
+	case Route::StreamOnly:
+		if (hidden_by_plugin(item)) {
+			set_hidden_by_plugin(item, false);
 			obs_sceneitem_set_visible(item, true);
+		}
+		break;
+	case Route::Off:
+		break;
 	}
 }
 

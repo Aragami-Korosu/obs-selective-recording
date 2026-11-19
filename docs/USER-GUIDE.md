@@ -101,8 +101,8 @@ The **Selective Recording** dock opens the first time OBS starts with the plugin
 - *Italic* means the profile default. A **•** marks a setting for one canvas or one placement.
 - Select several rows and right-click to change them all.
 - Search and filter: *Left out of recording*, *Recording only*, *Has warnings*.
-- **Recording only** works as it does with the Sources-list buttons: the source is hidden in OBS so it leaves the stream, and shown again when you change it back.
-- **Off** leaves the source out of the recording and doesn't touch your stream. Hide it in OBS yourself if you want it off the stream too; the dock warns you until you do.
+- **Recording only** works as it does with the Sources-list buttons: the source is hidden in OBS so it leaves the stream, and shown again when you set it to *Both* or *Stream only*, even if you click through *Off* on the way.
+- **Off** leaves the source out of the recording and doesn't change your stream. Hide it in OBS yourself if you want it off the stream too; the dock warns you until you do.
 
 </details>
 

@@ -461,6 +461,13 @@ def test_placements(h):
 
     item_route(recording_only, "both")
     check("back to Both shows the placement again", item_route(recording_only)["visible"] is True)
+    # The dock's All scenes view cycles Recording only → Off → Both.
+    item_route(recording_only, "recording_only")
+    item_route(recording_only, "off")
+    check("Off keeps a placement the plugin hid hidden", item_route(recording_only)["visible"] is False)
+    item_route(recording_only, "stream_only")
+    check("Recording only → Off → Stream only shows it again", item_route(recording_only)["visible"] is True)
+    item_route(recording_only, "both")
     item_route(user_hidden, "recording_only")
     item_route(user_hidden, "both")
     check("a placement you hid yourself stays hidden", item_route(user_hidden)["visible"] is False)
@@ -506,6 +513,8 @@ def test_audio_follows_video(h):
     level = media.tone_levels(path, [440], start=0.8, duration=2.0)[440]
     check("Both placement: its sound recorded", level > -6, f"{level:.1f} dB")
 
+    obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": "off"})
+    check("All scenes: Recording only → Off keeps it hidden", visible(box) is False)
     obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": "both"})
     check("All scenes: back to Both shows the source again", visible(box) is True)
     obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": ""})
