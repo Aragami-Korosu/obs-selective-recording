@@ -85,37 +85,39 @@ The **Selective Recording** dock opens the first time OBS starts with the plugin
 | **Settings** | Recording and interface options (see [Settings](#settings)) |
 | **Tabs** | One per canvas: **Main** and **Aitum Vertical** |
 | **Simple view** | The current scene with the same buttons as the Sources list |
-| **Advanced** | Every scene, with separate **Video** and **Audio** buttons |
+| **Advanced** | Every scene and your audio devices, with per-canvas options and **Off** |
 | **Preview** | Shows exactly what's being recorded |
 
 <details>
 <summary><b>Advanced view in detail</b></summary>
 
-- **Click** a Video or Audio button to cycle Both → Stream only → Recording only → Off.
+- **Click** a source's button to cycle Both → Stream only → Recording only → Off. It sets the source's video and sound together.
 - **Right-click** for:
   - **Every canvas** (normal)
   - **Only on this canvas**, for example to leave a webcam out of the vertical recording only
   - **Only this placement**, when the same source is in several scenes
-  - **Recording volume…** (audio only)
+  - **Recording volume…** (sources with sound)
   - **Reset to default**
 - *Italic* means the profile default. A **•** marks a setting for one canvas or one placement.
 - Select several rows and right-click to change them all.
 - Search and filter: *Left out of recording*, *Recording only*, *Has warnings*.
-- Settings made here **never change OBS**. If you set something to Recording only or Off here, hide it in OBS yourself; the dock warns you until you do.
+- **Recording only** works as it does with the Sources-list buttons: the source is hidden in OBS so it leaves the stream, and shown again when you change it back.
+- **Off** leaves the source out of the recording and doesn't touch your stream. Hide it in OBS yourself if you want it off the stream too; the dock warns you until you do.
 
 </details>
 
 ## Audio
 
-The buttons set what you **see**. Sound is set per source in the dock's **Advanced** view (Audio column), and is *Stream and recording* unless you change it.
+A source's **sound goes with its video.** Set Game Capture to **Stream only**, and both its picture and its game audio stay out of the recording.
 
-| You want | Set the Audio button to |
+| You want | Do this |
 | --- | --- |
-| Music on stream, not in the recording | **Stream only** |
-| A mic or sound only in the recording | **Recording only** (and untick it from the stream's track in OBS) |
-| Louder or quieter in the recording only | Right-click → **Recording volume…** |
+| Music on stream, not in the recording | Set the music source to **Stream only** |
+| A sound only in the recording | Set the source to **Recording only**. It's hidden in OBS, which mutes it on stream, and the recording keeps its sound |
+| Your mic or desktop audio left out of the recording | Dock → **Advanced** → **Audio devices**, set it to **Stream only** |
+| Louder or quieter in the recording only | Dock → **Advanced**, right-click the source → **Recording volume…** |
 
-A source set to **Recording only** with its button is muted on stream (OBS mutes hidden sources) but keeps its sound in the recording.
+Mic and desktop audio set up in **Settings → Audio** aren't in any scene, so they have their own button under **Audio devices** in the Advanced view. If you set one to **Recording only**, untick it from the stream's track in **Edit → Advanced Audio Properties**; the dock warns you until you do.
 
 ## Warnings ⚠
 

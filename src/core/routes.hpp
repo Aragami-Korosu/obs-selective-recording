@@ -12,9 +12,9 @@
 
 namespace selective_recording {
 
-// What a source contributes to the recording. The stream half is the user's intent, used for
-// warnings. Only the Streamlabs-style buttons act on it, by hiding a Recording only placement
-// in OBS (ADR-0003, ADR-0008).
+// What a source contributes to the recording, video and audio together (ADR-0010). The stream
+// half is the user's intent: choosing Recording only hides the placement in OBS so it leaves the
+// stream (ADR-0008), and warnings flag anything still live that shouldn't be (ADR-0003).
 enum class Route { Both, StreamOnly, RecordingOnly, Off };
 
 // Set in a scene item's private settings while the plugin is hiding it for Recording only.
@@ -39,6 +39,7 @@ Route next_route(Route route);
 
 struct SourceRule {
 	std::optional<Route> video;
+	// Only read from collections saved by earlier builds; RouteStore folds it into video on load.
 	std::optional<Route> audio;
 	std::optional<double> gain_db;
 
@@ -49,13 +50,12 @@ struct RouteProfile {
 	std::string id;
 	std::string name;
 	Route default_video = Route::Both;
-	Route default_audio = Route::Both;
 
 	// Keyed by source UUID.
 	std::map<std::string, SourceRule> sources;
 	// Keyed by canvas key, then source UUID.
 	std::map<std::string, std::map<std::string, SourceRule>> canvas_sources;
-	// Keyed by "<scene uuid>/<item id>". Video only: audio belongs to the source, not a placement.
+	// Keyed by "<scene uuid>/<item id>". The source's audio follows its placements.
 	std::map<std::string, Route> item_video;
 
 	obs_data_t *save() const;

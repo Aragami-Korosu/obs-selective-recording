@@ -5,16 +5,17 @@
 
 #include "core/routes.hpp"
 
+#include <functional>
 #include <string>
 
 namespace selective_recording {
 
 class Controller;
 
-// Placement routes work like Streamlabs Desktop's selective recording: one setting for the
-// video of one placement (a source in one scene), and the eye icon is never needed. They're
-// what the Sources-list buttons, the dock's simple view and SetItemRoute change. Audio is set
-// per source.
+// Placement routes work like Streamlabs Desktop's selective recording: one setting for one
+// placement (a source in one scene), and the eye icon is never needed. They're what the
+// Sources-list buttons, the dock's simple view and SetItemRoute change. A source's audio
+// follows its video: it's recorded while the source is visible in the recording.
 struct PlacementRoute {
 	Route route = Route::Both;
 	bool locked = false;
@@ -49,5 +50,10 @@ bool set_folder_route(Controller &controller, const std::string &canvas, obs_sce
 
 // Mixed → Both; otherwise the same cycle as a single placement.
 bool cycle_folder_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *folder);
+
+// Runs a change to source or canvas routes (the dock's Advanced view, SetRoute), then applies
+// the same stream rule as a placement to every placement whose route it changed: Recording
+// only hides it in OBS, and leaving Recording only shows it again if the plugin hid it.
+void change_routes(Controller &controller, const std::function<void()> &change);
 
 } // namespace selective_recording

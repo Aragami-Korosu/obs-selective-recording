@@ -32,13 +32,15 @@ public:
 	bool import_profile(obs_data_t *data);
 	obs_data_t *export_profile(size_t index) const;
 
+	// A source has one route for its video and audio (ADR-0010). resolve_audio is the route of the
+	// source as a whole, which decides for audio devices; in a scene, a source's audio is recorded
+	// while the source is visible in the recording.
 	ResolvedRoute resolve_video(const std::string &canvas, obs_source_t *source, obs_sceneitem_t *item) const;
 	ResolvedRoute resolve_audio(const std::string &canvas, obs_source_t *source) const;
 	double gain_db(const std::string &canvas, obs_source_t *source) const;
 
 	// An empty canvas sets the rule for every canvas. nullopt clears it.
 	void set_video(const std::string &canvas, obs_source_t *source, std::optional<Route> route);
-	void set_audio(const std::string &canvas, obs_source_t *source, std::optional<Route> route);
 	void set_gain(const std::string &canvas, obs_source_t *source, std::optional<double> gain_db);
 	void set_item_video(obs_sceneitem_t *item, std::optional<Route> route);
 	bool has_item_video(obs_sceneitem_t *item) const;

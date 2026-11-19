@@ -27,9 +27,8 @@ Inside the collection file's `"modules"` object:
       "id": "default",
       "name": "Default",
       "default_video_route": "both",
-      "default_audio_route": "both",
       "source_routes": {
-        "<source-uuid>": { "video": "stream_only", "audio": "off", "gain_db": -6.0 }
+        "<source-uuid>": { "video": "stream_only", "gain_db": -6.0 }
       },
       "canvases": {
         "Aitum Vertical": {
@@ -46,14 +45,16 @@ Inside the collection file's `"modules"` object:
 
 ### Route values
 
-| Value | In the recording | Stream (set by you in OBS) |
+`video` is the source's one route: it decides its video and its audio ([ADR-0010](adr/0010-audio-follows-video.md)). Collections saved by earlier builds may also have `audio` and `default_audio_route`. When the collection loads, an audio-only source's `audio` becomes its `video`, and other `audio` values are dropped.
+
+| Value | In the recording | Stream |
 | --- | --- | --- |
 | `both` | Included | Unchanged |
 | `stream_only` | Excluded | Unchanged |
-| `recording_only` | Included, even when hidden live | You hide it; the plugin warns if it's still live |
+| `recording_only` | Included, even when hidden live | The plugin hides each placement in OBS when you choose it |
 | `off` | Excluded | You hide it; the plugin warns if it's still live |
 
-Setting a route in the dock's Advanced view or with `SetRoute` never changes OBS ([ADR-0003](adr/0003-stream-exclusion.md)). Any unknown value is treated as `both`.
+Any unknown value is treated as `both`.
 
 ### Where the Streamlabs-style buttons save
 

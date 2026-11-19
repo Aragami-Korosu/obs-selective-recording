@@ -174,23 +174,27 @@ void set_route(obs_data_t *request, obs_data_t *response, void *)
 
 		const std::string canvas = obs_data_get_string(req, "canvas");
 		RouteStore &routes = c.routes();
-		bool changed = false;
 
-		if (obs_data_has_user_value(req, "video")) {
-			routes.set_video(canvas, source, optional_route_from_string(obs_data_get_string(req, "video")));
-			changed = true;
+		// One route covers video and audio (ADR-0010). "audio" is still accepted on its own, for
+		// scripts written before, and sets the same route.
+		const char *route_key = obs_data_has_user_value(req, "video")   ? "video"
+					: obs_data_has_user_value(req, "audio") ? "audio"
+										: nullptr;
+		const bool gain = obs_data_has_user_value(req, "gain_db");
+		if (!route_key && !gain) {
+			obs_data_set_bool(res, "ok", false);
+			return;
 		}
-		if (obs_data_has_user_value(req, "audio")) {
-			routes.set_audio(canvas, source, optional_route_from_string(obs_data_get_string(req, "audio")));
-			changed = true;
-		}
-		if (obs_data_has_user_value(req, "gain_db")) {
-			routes.set_gain(canvas, source, obs_data_get_double(req, "gain_db"));
-			changed = true;
-		}
-		if (changed)
-			c.routes_changed();
-		obs_data_set_bool(res, "ok", changed);
+
+		// Like the dock: Recording only also hides the source's placements so they leave the stream.
+		change_routes(c, [&]() {
+			if (route_key)
+				routes.set_video(canvas, source,
+						 optional_route_from_string(obs_data_get_string(req, route_key)));
+			if (gain)
+				routes.set_gain(canvas, source, obs_data_get_double(req, "gain_db"));
+		});
+		obs_data_set_bool(res, "ok", true);
 	});
 }
 

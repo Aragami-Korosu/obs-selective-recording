@@ -9,28 +9,25 @@
 
 namespace selective_recording {
 
-// Shows a route and cycles through routes on click. Right-click opens explicit choices.
+// Shows a source's route (its video and audio together) and cycles through routes on click.
+// Right-click opens explicit choices.
 class RouteButton : public QToolButton {
 	Q_OBJECT
 
 public:
-	enum class Kind { Video, Audio };
-
-	RouteButton(Kind kind, QWidget *parent = nullptr);
+	explicit RouteButton(QWidget *parent = nullptr);
 
 	void set_route(const ResolvedRoute &route);
 	Route route() const { return route_.route; }
-	Kind kind() const { return kind_; }
 
 	static QString label(Route route);
-	static QString description(Route route, Kind kind);
+	static QString description(Route route);
 
 signals:
 	void cycleRequested();
 	void menuRequested(const QPoint &global_pos);
 
 private:
-	Kind kind_;
 	ResolvedRoute route_;
 };
 

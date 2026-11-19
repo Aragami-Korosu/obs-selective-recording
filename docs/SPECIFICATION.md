@@ -4,14 +4,14 @@
 
 ## 1. Product vision
 
-OBS Selective Recording is a native OBS Studio plugin that records a composition that differs from your livestream. You choose, per source and separately for video and audio, what goes into the recording. The livestream is left exactly as you built it in OBS.
+OBS Selective Recording is a native OBS Studio plugin that records a composition that differs from your livestream. You choose, per source or per placement, what goes into the recording; a source's sound goes with its video. The livestream is left as you built it in OBS, except that a source you set to Recording only is hidden from it.
 
 The plugin must:
 
 - Run entirely inside OBS Studio, with no external services.
 - Provide a dedicated, dockable management interface.
-- Route video and audio into the recording independently for every supported source.
-- **Never modify the live composition of any canvas.** It controls only its own recordings ([ADR-0003](adr/0003-stream-exclusion.md)).
+- Route every supported source into the recording, its video and audio together ([ADR-0010](adr/0010-audio-follows-video.md)).
+- **Change the live composition only when the user chooses Recording only**, by hiding that placement in OBS ([ADR-0003](adr/0003-stream-exclusion.md), amended by [ADR-0008](adr/0008-streamlabs-style-placements.md)). Otherwise it controls only its own recordings.
 - Stay in sync with the active scene collection.
 - Keep routing configuration across OBS restarts.
 - Work with dual-output setups (horizontal and vertical). Each canvas gets its own selective recording ([section 3.5](#35-multiple-canvases-dual-output)).
@@ -24,18 +24,18 @@ The plugin must:
 
 ## 2. Routing model
 
-Each source has a **video route** and an **audio route**. The plugin controls only the **Recording** column. The **Stream** column describes what the user intends, and the user sets that in OBS. The plugin uses it only to decide when to warn.
+Each source, or each placement of a source, has one **route**, covering its video and its audio. The recording takes a source's audio while the source is visible in the recording. Audio devices that aren't in any scene (Settings → Audio) have a route of their own.
 
-| Route | Config value | Recording (plugin) | Stream (user, in OBS) |
+| Route | Config value | Recording (plugin) | Stream |
 | --- | --- | :---: | --- |
 | Both | `both` | Included | Unchanged |
 | Stream only | `stream_only` | Excluded | Unchanged |
-| Recording only | `recording_only` | Included | User hides it. The plugin warns if it's still live. |
+| Recording only | `recording_only` | Included | The plugin hides the placement in OBS, and shows it again when the route changes back. An audio device has to be removed from the stream's track by the user; the plugin warns until it is. |
 | Off | `off` | Excluded | User hides it. The plugin warns if it's still live. |
 
 Rules:
 
-- Video and audio routes are independent. Changing one never changes the other.
+- One route covers video and audio ([ADR-0010](adr/0010-audio-follows-video.md)).
 - When more than one rule applies, the most specific wins:
   1. Scene-item override (one placement of a source)
   2. Canvas-specific source rule (the source on one canvas only)
@@ -43,7 +43,6 @@ Rules:
   4. Group or nested-scene inheritance
   5. Profile default
   6. Built-in default (`both`)
-- The interface and documentation must never say that the plugin removes a source from a stream.
 - **Disabling the plugin** returns every recording to the default all-included composition. It must never produce a blank or partial recording.
 
 ## 3. Functional requirements

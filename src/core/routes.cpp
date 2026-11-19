@@ -122,7 +122,6 @@ obs_data_t *RouteProfile::save() const
 	obs_data_set_string(data, "id", id.c_str());
 	obs_data_set_string(data, "name", name.c_str());
 	obs_data_set_string(data, "default_video_route", route_to_string(default_video));
-	obs_data_set_string(data, "default_audio_route", route_to_string(default_audio));
 
 	OBSDataAutoRelease source_data = save_rules(sources);
 	obs_data_set_obj(data, "source_routes", source_data);
@@ -152,7 +151,6 @@ RouteProfile RouteProfile::load(obs_data_t *data)
 	profile.id = obs_data_get_string(data, "id");
 	profile.name = obs_data_get_string(data, "name");
 	profile.default_video = route_from_string(obs_data_get_string(data, "default_video_route"));
-	profile.default_audio = route_from_string(obs_data_get_string(data, "default_audio_route"));
 
 	OBSDataAutoRelease source_data = obs_data_get_obj(data, "source_routes");
 	profile.sources = load_rules(source_data);

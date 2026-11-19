@@ -260,17 +260,10 @@ ResolvedRoute RouteStore::resolve_video(const std::string &canvas, obs_source_t 
 
 ResolvedRoute RouteStore::resolve_audio(const std::string &canvas, obs_source_t *source) const
 {
-	const RouteProfile &profile = active();
-	const char *uuid = source ? obs_source_get_uuid(source) : nullptr;
-	if (uuid) {
-		const SourceRule *rule = find_rule(canvas, uuid);
-		if (rule && rule->audio)
-			return {*rule->audio, RouteOrigin::Canvas};
-		rule = find_rule("", uuid);
-		if (rule && rule->audio)
-			return {*rule->audio, RouteOrigin::Source};
-	}
-	return {profile.default_audio, RouteOrigin::ProfileDefault};
+	// Audio follows video (ADR-0010). For a source in a scene, the recording takes its audio while
+	// the source is visible in the recording; this is the route of the source as a whole, which is
+	// what decides for audio devices and the stream warnings.
+	return resolve_video(canvas, source, nullptr);
 }
 
 double RouteStore::gain_db(const std::string &canvas, obs_source_t *source) const
@@ -293,15 +286,6 @@ void RouteStore::set_video(const std::string &canvas, obs_source_t *source, std:
 	if (!rule)
 		return;
 	rule->video = route;
-	changed();
-}
-
-void RouteStore::set_audio(const std::string &canvas, obs_source_t *source, std::optional<Route> route)
-{
-	SourceRule *rule = rule_for(canvas, source, route.has_value());
-	if (!rule)
-		return;
-	rule->audio = route;
 	changed();
 }
 
@@ -349,9 +333,23 @@ void RouteStore::remove_missing_sources()
 		return source && obs_source_is_group(source);
 	};
 
+	// Earlier versions had a separate audio setting; audio now follows the source's one setting
+	// (ADR-0010). An audio-only source (a mic, desktop audio, an app capture) keeps its audio
+	// setting as that one setting. A source with video keeps its video setting.
+	auto video_capable = [](const std::string &uuid) {
+		OBSSourceAutoRelease source = obs_get_source_by_uuid(uuid.c_str());
+		return !source || (obs_source_get_output_flags(source) & OBS_SOURCE_VIDEO) != 0;
+	};
+
 	bool removed = false;
 	auto prune = [&](std::map<std::string, SourceRule> &rules) {
 		for (auto it = rules.begin(); it != rules.end();) {
+			if (it->second.audio) {
+				if (!it->second.video && !video_capable(it->first))
+					it->second.video = it->second.audio;
+				it->second.audio.reset();
+				removed = true;
+			}
 			if (it->second.video && is_folder(it->first)) {
 				it->second.video.reset();
 				removed = true;

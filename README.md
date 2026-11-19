@@ -86,7 +86,7 @@ If one recording fails, the other keeps going, and neither stream is affected.
 
 - 🔘 **Streamlabs-style buttons** in OBS's Sources list and Aitum Vertical's Vertical Sources dock
 - ⏺ **OBS's Record button records selectively**, just like Streamlabs (you can switch this off)
-- 🔊 **Separate audio control**: keep music on stream but out of the recording, or the other way round
+- 🔊 **Sound goes with the source**: set Game Capture to Stream only and its game audio stays out of the recording too
 - 🧭 **Follows everything**: scene switches, transitions, Studio Mode, nested scenes and folders
 - ⚙️ **Recording settings per canvas**: NVENC, AMD, QuickSync or x264, quality, resolution, frame rate, MKV/MP4/MOV
 - ⚠️ **Warnings** if something you wanted off the stream is still live
@@ -114,7 +114,7 @@ Streamlabs runs its own modified version of OBS that can show a source on one ou
 <details>
 <summary><b>Does it change my stream?</b></summary>
 
-Only when you choose **Recording only**, which hides that source on stream (that's the point). It never changes your stream settings, audio tracks or anything in other plugins.
+Only when you choose **Recording only**, which hides that source on stream (that's the point), whether you use the Sources-list button or the dock. It never changes your stream settings, audio tracks or anything in other plugins.
 
 </details>
 

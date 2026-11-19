@@ -50,8 +50,7 @@ private:
 		std::string uuid;
 		std::string scene_name;
 		QTreeWidgetItem *tree_item = nullptr;
-		RouteButton *video = nullptr;
-		RouteButton *audio = nullptr;
+		RouteButton *route = nullptr;     // advanced view: video and audio together
 		QToolButton *placement = nullptr; // simple view
 		QLabel *warning = nullptr;
 	};
@@ -66,13 +65,11 @@ private:
 	OBSSource current_scene() const;
 	void add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, const std::string &scene_name);
 	void add_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sceneitem_t *item,
-		     const std::string &scene_name, bool allow_video, bool allow_audio);
+		     const std::string &scene_name, bool has_route);
 	std::string structure_signature() const;
 
-	void cycle_video(const Row &row);
-	void cycle_audio(const Row &row);
-	void show_video_menu(const Row &row, const QPoint &pos);
-	void show_audio_menu(const Row &row, const QPoint &pos);
+	void cycle_route(const Row &row);
+	void show_route_menu(const Row &row, const QPoint &pos);
 	void show_tree_menu(const QPoint &pos);
 	void apply_filter();
 

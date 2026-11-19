@@ -140,18 +140,20 @@ void Pipeline::update_audio_inputs()
 		return;
 
 	const bool enabled = controller_.settings().enabled;
-	std::vector<OBSSource> candidates = global_audio_sources();
+	const std::vector<OBSSource> globals = global_audio_sources();
+	std::vector<OBSSource> candidates = globals;
 
 	OBSSourceAutoRelease live = obs_canvas_get_channel(canvas_, 0);
 	for (auto &source : active_tree(live)) {
 		if (!contains_source(candidates, source))
 			candidates.push_back(source);
 	}
-	if (mirror_) {
-		for (auto &source : mirror_->active_sources()) {
-			if (!contains_source(candidates, source))
-				candidates.push_back(source);
-		}
+	// Sources visible in the recording. Audio follows video (ADR-0010), so a source's audio is
+	// recorded exactly when one of its placements is.
+	const std::vector<OBSSource> recorded = mirror_ ? mirror_->active_sources() : std::vector<OBSSource>{};
+	for (auto &source : recorded) {
+		if (!contains_source(candidates, source))
+			candidates.push_back(source);
 	}
 
 	std::vector<AudioMixer::Input> inputs;
@@ -167,7 +169,9 @@ void Pipeline::update_audio_inputs()
 			input.include = !is_monitor_only(source);
 		} else {
 			const ResolvedRoute route = controller_.routes().resolve_audio(key_, source);
-			input.include = in_recording(route.route);
+			// Audio devices aren't in any scene, so their own route decides.
+			input.include = contains_source(recorded, source) ||
+					(contains_source(globals, source) && in_recording(route.route));
 			// Monitor-only sources are left out of OBS's mix, so they stay out unless asked for.
 			if (route.origin == RouteOrigin::ProfileDefault && is_monitor_only(source))
 				input.include = false;

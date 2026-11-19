@@ -26,7 +26,7 @@ const char *color_for(Route route)
 
 } // namespace
 
-RouteButton::RouteButton(Kind kind, QWidget *parent) : QToolButton(parent), kind_(kind)
+RouteButton::RouteButton(QWidget *parent) : QToolButton(parent)
 {
 	setAutoRaise(false);
 	setCursor(Qt::PointingHandCursor);
@@ -54,18 +54,17 @@ QString RouteButton::label(Route route)
 	return {};
 }
 
-QString RouteButton::description(Route route, Kind kind)
+QString RouteButton::description(Route route)
 {
-	const bool video = kind == Kind::Video;
 	switch (route) {
 	case Route::Both:
-		return obs_module_text(video ? "RouteHelp.Video.Both" : "RouteHelp.Audio.Both");
+		return obs_module_text("RouteHelp.Both");
 	case Route::StreamOnly:
-		return obs_module_text(video ? "RouteHelp.Video.StreamOnly" : "RouteHelp.Audio.StreamOnly");
+		return obs_module_text("RouteHelp.StreamOnly");
 	case Route::RecordingOnly:
-		return obs_module_text(video ? "RouteHelp.Video.RecordingOnly" : "RouteHelp.Audio.RecordingOnly");
+		return obs_module_text("RouteHelp.RecordingOnly");
 	case Route::Off:
-		return obs_module_text(video ? "RouteHelp.Video.Off" : "RouteHelp.Audio.Off");
+		return obs_module_text("RouteHelp.Off");
 	}
 	return {};
 }
@@ -99,9 +98,8 @@ void RouteButton::set_route(const ResolvedRoute &route)
 			      .arg(QString::fromLatin1(color_for(route.route)),
 				   inherited ? QStringLiteral("italic") : QStringLiteral("normal")));
 
-	setToolTip(description(route.route, kind_) + QStringLiteral("\n\n") +
-		   QString::fromUtf8(obs_module_text(origin_key)) + QStringLiteral("\n") +
-		   QString::fromUtf8(obs_module_text("RouteHelp.Click")));
+	setToolTip(description(route.route) + QStringLiteral("\n\n") + QString::fromUtf8(obs_module_text(origin_key)) +
+		   QStringLiteral("\n") + QString::fromUtf8(obs_module_text("RouteHelp.Click")));
 }
 
 } // namespace selective_recording

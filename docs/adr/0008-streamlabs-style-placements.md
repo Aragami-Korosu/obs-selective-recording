@@ -1,6 +1,6 @@
 # 0008. Streamlabs-style buttons set placements and hide Recording only from the stream
 
-- **Status:** Accepted
+- **Status:** Accepted, amended by [0010](0010-audio-follows-video.md): audio now follows video, and the Advanced view and `SetRoute` apply the Recording only rule too.
 - **Date:** 2026-11-18
 - **Amends:** [0003](0003-stream-exclusion.md)
 

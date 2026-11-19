@@ -1,6 +1,6 @@
 # 0004. Build an independent audio mix instead of using OBS tracks
 
-- **Status:** Accepted. POC 2 is complete; see "Findings" below.
+- **Status:** Accepted. POC 2 is complete; see "Findings" below. Amended by [0010](0010-audio-follows-video.md): which sources the mix includes now follows their video.
 - **Date:** 2026-11-17
 
 ## Context

@@ -25,7 +25,7 @@ Canvases are identified by key: `main` for OBS's main canvas, otherwise the canv
 | `PauseRecording` | `canvas`? | `ok` |
 | `ResumeRecording` | `canvas`? | `ok` |
 | `SetEnabled` | `enabled` | `ok` |
-| `SetRoute` | `source_name` or `source_uuid`; `canvas`?; `video`?; `audio`?; `gain_db`? | `ok` |
+| `SetRoute` | `source_name` or `source_uuid`; `canvas`?; `video`?; `gain_db`? | `ok` |
 | `GetRoute` | `source_name` or `source_uuid`; `canvas`? | `video`, `audio`, `gain_db` |
 | `SetItemRoute` | `scene_name` or `scene_uuid`; `item_id`; `video`; `canvas`? | `ok` |
 | `GetItemRoute` | `scene_name` or `scene_uuid`; `item_id`; `canvas`? | `video`, `folder`, `mixed` (folders), `locked`, `visible` |
@@ -36,7 +36,9 @@ Canvases are identified by key: `main` for OBS's main canvas, otherwise the canv
 
 Route values are `both`, `stream_only`, `recording_only` and `off`. An empty string clears the rule.
 
-In `SetRoute`, leaving out `canvas` sets the rule for every canvas. Giving a canvas sets a per-canvas override. `SetRoute` never changes OBS.
+A source has one route for its video and audio ([ADR-0010](adr/0010-audio-follows-video.md)). `video` sets it; `audio` is accepted as another name for the same route, for older scripts. `GetRoute` returns the same value in both fields.
+
+In `SetRoute`, leaving out `canvas` sets the rule for every canvas. Giving a canvas sets a per-canvas override. Like the dock's Advanced view, `recording_only` hides each placement of the source whose route it changes, so it leaves the stream, and moving off `recording_only` shows them again if the plugin hid them.
 
 `SetItemRoute` sets one placement's video, exactly like clicking a Sources-list button ([ADR-0008](adr/0008-streamlabs-style-placements.md)):
 - `recording_only` also hides the scene item in OBS, so it leaves the stream, and moving it off `recording_only` shows it again if the plugin hid it.

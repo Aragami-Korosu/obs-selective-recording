@@ -143,7 +143,7 @@ flowchart LR
 `AudioMixer` builds the recording audio from individual sources ([ADR-0004](adr/0004-independent-audio-mix.md)).
 
 1. **Candidates.** Each tick works out which sources can contribute: global audio devices, sources on air in the original program, and sources on air in the mirror.
-2. **Inclusion.** A candidate is included when its audio route is Both or Recording only.
+2. **Inclusion.** Audio follows video ([ADR-0010](adr/0010-audio-follows-video.md)). A source is included while it's active in the mirror, meaning one of its placements is visible in the recording. An audio device isn't in any scene, so it's included when its own route is Both or Recording only.
 3. **Capture.** Each included source gets a capture callback. The callback re-applies libobs's timestamp rules and sync offset, then writes the audio into a three-second ring buffer at its timestamp. Muted audio is written as silence.
 4. **Mixing.** The `audio_t` callback mixes one 1,024-frame window at a time. Each source is scaled by its OBS fader and its recording gain, and a soft limiter keeps peaks below full scale.
 5. **Buffering.** The output window trails real time by a buffer that starts at 64 ms. When a source arrives late, the buffer grows by skipping a block, exactly as libobs does.

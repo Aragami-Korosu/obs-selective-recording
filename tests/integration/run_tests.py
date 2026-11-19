@@ -469,6 +469,50 @@ def test_placements(h):
     time.sleep(1)
 
 
+def test_audio_follows_video(h):
+    """One route per source: sound goes with the video, and Recording only leaves the stream (ADR-0010)."""
+    print("Audio follows video; Recording only from the dock's Advanced view")
+    obs = h.obs
+    obs.call("CreateScene", {"sceneName": "SR Audio"}, allow_fail=True)
+    h.color("SR Box Adv", CYAN, 300, 300)
+    h.add("SR Audio", "SR BG Red", 0, 0)
+    box = h.add("SR Audio", "SR Box Adv", 100, 100)
+    tone = h.add("SR Audio", "SR Tone 440", 0, 0)
+
+    routes = obs.vendor("GetRoute", {"source_name": "SR Tone 1000"})
+    check("an 'audio' route sets the source's one route", routes["video"] == "off" and routes["audio"] == "off",
+          routes)
+
+    def visible(item_id):
+        return obs.vendor("GetItemRoute", {"scene_name": "SR Audio", "item_id": item_id})["visible"]
+
+    # The dock's Advanced view and SetRoute set the source as a whole.
+    obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": "recording_only"})
+    check("Advanced: Recording only hides the source in OBS", visible(box) is False)
+    obs.vendor("SetItemRoute", {"scene_name": "SR Audio", "item_id": tone, "video": "stream_only"})
+    obs.call("SetCurrentProgramScene", {"sceneName": "SR Audio"})
+    time.sleep(1)
+
+    path = h.record("main", 4)
+    check("Advanced: recording-only source recorded", media.pixel(path, 1.5, 250, 250) == "cyan",
+          media.pixel(path, 1.5, 250, 250))
+    check("live: recording-only source off the stream", h.live_color("SR Audio", 250, 250) == "red")
+    level = media.tone_levels(path, [440], start=0.8, duration=2.0)[440]
+    check("Stream only placement: its sound left out of the recording", level < -40, f"{level:.1f} dB")
+
+    obs.vendor("SetItemRoute", {"scene_name": "SR Audio", "item_id": tone, "video": "both"})
+    time.sleep(0.5)
+    path = h.record("main", 4)
+    level = media.tone_levels(path, [440], start=0.8, duration=2.0)[440]
+    check("Both placement: its sound recorded", level > -6, f"{level:.1f} dB")
+
+    obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": "both"})
+    check("Advanced: back to Both shows the source again", visible(box) is True)
+    obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": ""})
+    obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
+    time.sleep(1)
+
+
 def test_transition_blend(h):
     print("Animated transitions are mirrored")
     h.obs.call("SetCurrentSceneTransition", {"transitionName": "Fade"}, allow_fail=True)
@@ -758,7 +802,7 @@ def main():
 
     tests = [test_discovery, setup, test_main_recording, test_gain, test_warnings, test_vertical,
              test_failure_isolation, test_pause, test_groups, test_studio_mode, test_placements,
-             test_transition_blend,
+             test_audio_follows_video, test_transition_blend,
              test_source_removed, test_hotkey, test_av_sync, test_performance, test_live_stream, test_disabled,
              test_collection_switch]
     for test in tests:

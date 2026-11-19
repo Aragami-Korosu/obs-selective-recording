@@ -6,6 +6,7 @@
 #include "core/controller.hpp"
 #include "core/obs-utils.hpp"
 #include "core/pipeline.hpp"
+#include "core/placement.hpp"
 #include "ui/preview-widget.hpp"
 #include "ui/route-button.hpp"
 #include "ui/settings-dialog.hpp"
@@ -39,7 +40,7 @@ namespace selective_recording {
 
 namespace {
 
-enum Column { ColName = 0, ColVideo, ColAudio, ColWarning };
+enum Column { ColName = 0, ColRoute, ColWarning };
 enum Filter { FilterAll = 0, FilterExcluded, FilterRecordingOnly, FilterWarnings };
 constexpr int kPathRole = Qt::UserRole + 1;
 constexpr int kRowRole = Qt::UserRole + 2;
@@ -134,11 +135,10 @@ CanvasTab::CanvasTab(Controller &controller, std::string key, QWidget *parent)
 	layout->addWidget(warning_summary_);
 
 	tree_ = new QTreeWidget(this);
-	tree_->setColumnCount(4);
-	tree_->setHeaderLabels({text("Dock.Source"), text("Dock.Video"), text("Dock.Audio"), QString()});
+	tree_->setColumnCount(3);
+	tree_->setHeaderLabels({text("Dock.Source"), text("Dock.Route"), QString()});
 	tree_->header()->setSectionResizeMode(ColName, QHeaderView::Stretch);
-	tree_->header()->setSectionResizeMode(ColVideo, QHeaderView::ResizeToContents);
-	tree_->header()->setSectionResizeMode(ColAudio, QHeaderView::ResizeToContents);
+	tree_->header()->setSectionResizeMode(ColRoute, QHeaderView::ResizeToContents);
 	tree_->header()->setSectionResizeMode(ColWarning, QHeaderView::ResizeToContents);
 	tree_->header()->setStretchLastSection(false);
 	tree_->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -214,8 +214,7 @@ void CanvasTab::set_simple(bool simple)
 	}
 	filter_->setVisible(!simple);
 	scene_label_->setVisible(simple);
-	tree_->setColumnHidden(ColAudio, simple);
-	tree_->headerItem()->setText(ColVideo, simple ? text("Simple.Column") : text("Dock.Video"));
+	tree_->headerItem()->setText(ColRoute, simple ? text("Simple.Column") : text("Dock.Route"));
 	rebuild_if_changed(true);
 }
 
@@ -348,7 +347,7 @@ void CanvasTab::build_tree()
 			auto *row = new QTreeWidgetItem(section);
 			row->setText(ColName, QString::fromStdString(source_name(source)));
 			row->setData(ColName, kPathRole, QString::fromStdString("audio:" + source_uuid(source)));
-			add_row(row, source, nullptr, {}, false, true);
+			add_row(row, source, nullptr, {}, true);
 		}
 		section->setExpanded(first_build || expanded.contains(QStringLiteral("audio-devices")));
 	}
@@ -412,7 +411,7 @@ void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source,
 		row.placement->setMinimumWidth(120);
 		row.placement->setCursor(Qt::PointingHandCursor);
 		row.placement->setContextMenuPolicy(Qt::CustomContextMenu);
-		tree_->setItemWidget(tree_item, ColVideo, row.placement);
+		tree_->setItemWidget(tree_item, ColRoute, row.placement);
 		connect(row.placement, &QToolButton::clicked, this, [this, index, folder]() {
 			if (folder)
 				cycle_folder_route(controller_, key_, rows_[index].item);
@@ -473,9 +472,10 @@ void CanvasTab::add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, con
 
 		const bool is_group = obs_sceneitem_is_group(item);
 		const bool is_scene = obs_source_is_scene(source);
-		// Folders follow OBS's eye icon; the sources inside them have the buttons.
-		add_row(tree_item, source, item, scene_name, (has_video(source) || is_scene) && !is_group,
-			has_audio(source) && !is_group && !is_scene);
+		// Folders follow OBS's eye icon; the sources inside them have the buttons. One button sets
+		// a source's video and audio together.
+		add_row(tree_item, source, item, scene_name,
+			(has_video(source) || has_audio(source) || is_scene) && !is_group);
 
 		if (is_group) {
 			add_scene_items(tree_item, obs_sceneitem_group_get_scene(item), scene_name);
@@ -485,7 +485,7 @@ void CanvasTab::add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, con
 }
 
 void CanvasTab::add_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sceneitem_t *item,
-			const std::string &scene_name, bool allow_video, bool allow_audio)
+			const std::string &scene_name, bool has_route)
 {
 	Row row;
 	row.source = source;
@@ -496,19 +496,12 @@ void CanvasTab::add_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sc
 	const size_t index = rows_.size();
 	tree_item->setData(ColName, kRowRole, (qulonglong)index);
 
-	if (allow_video) {
-		row.video = new RouteButton(RouteButton::Kind::Video, tree_);
-		tree_->setItemWidget(tree_item, ColVideo, row.video);
-		connect(row.video, &RouteButton::cycleRequested, this, [this, index]() { cycle_video(rows_[index]); });
-		connect(row.video, &RouteButton::menuRequested, this,
-			[this, index](const QPoint &pos) { show_video_menu(rows_[index], pos); });
-	}
-	if (allow_audio) {
-		row.audio = new RouteButton(RouteButton::Kind::Audio, tree_);
-		tree_->setItemWidget(tree_item, ColAudio, row.audio);
-		connect(row.audio, &RouteButton::cycleRequested, this, [this, index]() { cycle_audio(rows_[index]); });
-		connect(row.audio, &RouteButton::menuRequested, this,
-			[this, index](const QPoint &pos) { show_audio_menu(rows_[index], pos); });
+	if (has_route) {
+		row.route = new RouteButton(tree_);
+		tree_->setItemWidget(tree_item, ColRoute, row.route);
+		connect(row.route, &RouteButton::cycleRequested, this, [this, index]() { cycle_route(rows_[index]); });
+		connect(row.route, &RouteButton::menuRequested, this,
+			[this, index](const QPoint &pos) { show_route_menu(rows_[index], pos); });
 	}
 
 	row.warning = new QLabel(tree_);
@@ -521,10 +514,14 @@ void CanvasTab::refresh_routes()
 {
 	const RouteStore &routes = controller_.routes();
 	for (Row &row : rows_) {
-		if (row.video)
-			row.video->set_route(routes.resolve_video(key_, row.source, row.item));
-		if (row.audio)
-			row.audio->set_route(routes.resolve_audio(key_, row.source));
+		if (row.route)
+			row.route->set_route(routes.resolve_video(key_, row.source, row.item));
+		if (row.route && row.item) {
+			// Recording only hides the placement in OBS, so grey it out as OBS does.
+			const QPalette::ColorGroup group = obs_sceneitem_visible(row.item) ? QPalette::Active
+											   : QPalette::Disabled;
+			row.tree_item->setForeground(ColName, palette().brush(group, QPalette::Text));
+		}
 		if (row.placement && obs_sceneitem_is_group(row.item)) {
 			const FolderRoute route = folder_route(controller_, key_, row.item);
 			row.placement->setIcon(route_icon(route.route, route.mixed));
@@ -662,30 +659,24 @@ void CanvasTab::refresh_state()
 		preview_->set_canvas(pipeline->render_canvas());
 }
 
-void CanvasTab::cycle_video(const Row &row)
+void CanvasTab::cycle_route(const Row &row)
 {
 	RouteStore &routes = controller_.routes();
 	const ResolvedRoute current = routes.resolve_video(key_, row.source, row.item);
 	const Route next = next_route(current.route);
-	if (current.origin == RouteOrigin::Item)
-		routes.set_item_video(row.item, next);
-	else if (current.origin == RouteOrigin::Canvas)
-		routes.set_video(key_, row.source, next);
-	else
-		routes.set_video("", row.source, next);
-	controller_.routes_changed();
+	OBSSource source = row.source;
+	OBSSceneItem item = row.item;
+	change_routes(controller_, [&]() {
+		if (current.origin == RouteOrigin::Item)
+			routes.set_item_video(item, next);
+		else if (current.origin == RouteOrigin::Canvas)
+			routes.set_video(key_, source, next);
+		else
+			routes.set_video("", source, next);
+	});
 }
 
-void CanvasTab::cycle_audio(const Row &row)
-{
-	RouteStore &routes = controller_.routes();
-	const ResolvedRoute current = routes.resolve_audio(key_, row.source);
-	const Route next = next_route(current.route);
-	routes.set_audio(current.origin == RouteOrigin::Canvas ? key_ : "", row.source, next);
-	controller_.routes_changed();
-}
-
-void CanvasTab::show_video_menu(const Row &row, const QPoint &pos)
+void CanvasTab::show_route_menu(const Row &row, const QPoint &pos)
 {
 	RouteStore &routes = controller_.routes();
 	Pipeline *pipeline = controller_.pipeline(key_);
@@ -693,95 +684,60 @@ void CanvasTab::show_video_menu(const Row &row, const QPoint &pos)
 	OBSSource source = row.source;
 	OBSSceneItem item = row.item;
 
+	// Every change goes through change_routes, so Recording only takes the source off the stream.
+	auto apply = [this](std::function<void()> change) {
+		change_routes(controller_, change);
+	};
+
 	QMenu menu(this);
-	menu.addSection(text("Menu.VideoEverywhere"));
+	menu.addSection(text("Menu.Everywhere"));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		menu.addAction(RouteButton::label(r), this, [this, &routes, source, r]() {
-			routes.set_video("", source, r);
-			controller_.routes_changed();
-		});
+		menu.addAction(RouteButton::label(r), this,
+			       [apply, &routes, source, r]() { apply([&]() { routes.set_video("", source, r); }); });
 	}
 
 	QMenu *canvas_menu = menu.addMenu(text("Menu.OnlyCanvas").arg(canvas_name));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		canvas_menu->addAction(RouteButton::label(r), this, [this, &routes, source, r]() {
-			routes.set_video(key_, source, r);
-			controller_.routes_changed();
+		canvas_menu->addAction(RouteButton::label(r), this, [this, apply, &routes, source, r]() {
+			apply([&]() { routes.set_video(key_, source, r); });
 		});
 	}
 	canvas_menu->addSeparator();
-	canvas_menu->addAction(text("Menu.Clear"), this, [this, &routes, source]() {
-		routes.set_video(key_, source, std::nullopt);
-		controller_.routes_changed();
+	canvas_menu->addAction(text("Menu.Clear"), this, [this, apply, &routes, source]() {
+		apply([&]() { routes.set_video(key_, source, std::nullopt); });
 	});
 
 	if (item) {
 		QMenu *item_menu = menu.addMenu(text("Menu.OnlyItem").arg(QString::fromStdString(row.scene_name)));
 		for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-			item_menu->addAction(RouteButton::label(r), this, [this, &routes, item, r]() {
-				routes.set_item_video(item, r);
-				controller_.routes_changed();
+			item_menu->addAction(RouteButton::label(r), this, [apply, &routes, item, r]() {
+				apply([&]() { routes.set_item_video(item, r); });
 			});
 		}
 		item_menu->addSeparator();
-		item_menu->addAction(text("Menu.Clear"), this, [this, &routes, item]() {
-			routes.set_item_video(item, std::nullopt);
-			controller_.routes_changed();
+		item_menu->addAction(text("Menu.Clear"), this, [apply, &routes, item]() {
+			apply([&]() { routes.set_item_video(item, std::nullopt); });
 		});
 	}
 
 	menu.addSeparator();
-	menu.addAction(text("Menu.Reset"), this, [this, &routes, source]() {
-		routes.set_video("", source, std::nullopt);
-		controller_.routes_changed();
-	});
-	menu.exec(pos);
-}
-
-void CanvasTab::show_audio_menu(const Row &row, const QPoint &pos)
-{
-	RouteStore &routes = controller_.routes();
-	Pipeline *pipeline = controller_.pipeline(key_);
-	const QString canvas_name = pipeline ? QString::fromStdString(pipeline->name()) : QString();
-	OBSSource source = row.source;
-
-	QMenu menu(this);
-	menu.addSection(text("Menu.AudioEverywhere"));
-	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		menu.addAction(RouteButton::label(r), this, [this, &routes, source, r]() {
-			routes.set_audio("", source, r);
+	if (has_audio(source)) {
+		menu.addAction(text("Menu.Gain"), this, [this, &routes, source]() {
+			bool ok = false;
+			const double current = routes.gain_db("", source);
+			const double value = QInputDialog::getDouble(
+				this, text("Menu.GainTitle"), text("Menu.GainLabel"), current, -30.0, 20.0, 1, &ok);
+			if (!ok)
+				return;
+			routes.set_gain("", source, value == 0.0 ? std::nullopt : std::optional<double>(value));
 			controller_.routes_changed();
 		});
 	}
-
-	QMenu *canvas_menu = menu.addMenu(text("Menu.OnlyCanvas").arg(canvas_name));
-	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		canvas_menu->addAction(RouteButton::label(r), this, [this, &routes, source, r]() {
-			routes.set_audio(key_, source, r);
-			controller_.routes_changed();
+	menu.addAction(text("Menu.Reset"), this, [apply, &routes, source]() {
+		apply([&]() {
+			routes.set_video("", source, std::nullopt);
+			routes.set_gain("", source, std::nullopt);
 		});
-	}
-	canvas_menu->addSeparator();
-	canvas_menu->addAction(text("Menu.Clear"), this, [this, &routes, source]() {
-		routes.set_audio(key_, source, std::nullopt);
-		controller_.routes_changed();
-	});
-
-	menu.addSeparator();
-	menu.addAction(text("Menu.Gain"), this, [this, &routes, source]() {
-		bool ok = false;
-		const double current = routes.gain_db("", source);
-		const double value = QInputDialog::getDouble(this, text("Menu.GainTitle"), text("Menu.GainLabel"),
-							     current, -30.0, 20.0, 1, &ok);
-		if (!ok)
-			return;
-		routes.set_gain("", source, value == 0.0 ? std::nullopt : std::optional<double>(value));
-		controller_.routes_changed();
-	});
-	menu.addAction(text("Menu.Reset"), this, [this, &routes, source]() {
-		routes.set_audio("", source, std::nullopt);
-		routes.set_gain("", source, std::nullopt);
-		controller_.routes_changed();
 	});
 	menu.exec(pos);
 }
@@ -821,31 +777,23 @@ void CanvasTab::show_tree_menu(const QPoint &pos)
 	}
 
 	menu.addSection(text("Menu.Selected").arg(selected.size()));
-
-	QMenu *video = menu.addMenu(text("Dock.Video"));
-	QMenu *audio = menu.addMenu(text("Dock.Audio"));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		video->addAction(RouteButton::label(r), this, [this, &routes, selected, r]() {
-			for (auto &s : selected)
-				routes.set_video("", s, r);
-			controller_.routes_changed();
-		});
-		audio->addAction(RouteButton::label(r), this, [this, &routes, selected, r]() {
-			for (auto &s : selected) {
-				if (has_audio(s))
-					routes.set_audio("", s, r);
-			}
-			controller_.routes_changed();
+		menu.addAction(RouteButton::label(r), this, [this, &routes, selected, r]() {
+			change_routes(controller_, [&]() {
+				for (auto &s : selected)
+					routes.set_video("", s, r);
+			});
 		});
 	}
 
 	menu.addSeparator();
 	menu.addAction(text("Menu.Reset"), this, [this, &routes, selected]() {
-		for (auto &s : selected) {
-			routes.set_video("", s, std::nullopt);
-			routes.set_audio("", s, std::nullopt);
-		}
-		controller_.routes_changed();
+		change_routes(controller_, [&]() {
+			for (auto &s : selected) {
+				routes.set_video("", s, std::nullopt);
+				routes.set_gain("", s, std::nullopt);
+			}
+		});
 	});
 	menu.exec(tree_->viewport()->mapToGlobal(pos));
 }
@@ -866,18 +814,17 @@ void CanvasTab::apply_filter()
 		if (!needle.isEmpty() && !item->text(ColName).contains(needle, Qt::CaseInsensitive))
 			return false;
 
-		Route video = row.video ? row.video->route() : Route::Both;
-		Route audio = row.audio ? row.audio->route() : Route::Both;
-		if (row.placement) {
-			video = audio = placement_route(controller_, key_, row.item).route;
-			if (mode == FilterExcluded)
-				return !in_recording(video);
-		}
+		const bool has_route = row.route || row.placement;
+		Route route = Route::Both;
+		if (row.route)
+			route = row.route->route();
+		else if (row.placement)
+			route = placement_route(controller_, key_, row.item).route;
 		switch (mode) {
 		case FilterExcluded:
-			return (row.video && !in_recording(video)) || (row.audio && !in_recording(audio));
+			return has_route && !in_recording(route);
 		case FilterRecordingOnly:
-			return video == Route::RecordingOnly || audio == Route::RecordingOnly;
+			return has_route && route == Route::RecordingOnly;
 		case FilterWarnings:
 			return canvas_it != all.end() && canvas_it->second.count(row.uuid) &&
 			       canvas_it->second.at(row.uuid).any();
