@@ -7,6 +7,7 @@
 #include "core/obs-utils.hpp"
 #include "core/pipeline.hpp"
 #include "core/placement.hpp"
+#include "ui/icons.hpp"
 #include "ui/preview-widget.hpp"
 #include "ui/route-button.hpp"
 #include "ui/settings-dialog.hpp"
@@ -41,6 +42,8 @@ namespace selective_recording {
 namespace {
 
 enum Column { ColName = 0, ColRoute, ColWarning };
+constexpr int kWarningWidth = 24;
+constexpr int kRowHeight = 28;
 enum Filter { FilterAll = 0, FilterExcluded, FilterRecordingOnly, FilterWarnings };
 constexpr int kPathRole = Qt::UserRole + 1;
 constexpr int kRowRole = Qt::UserRole + 2;
@@ -48,6 +51,23 @@ constexpr int kRowRole = Qt::UserRole + 2;
 QString text(const char *key)
 {
 	return QString::fromUtf8(obs_module_text(key));
+}
+
+// Centres a chip vertically in its cell, so the tree's row height doesn't stretch it.
+QWidget *chip_cell(QWidget *chip)
+{
+	auto *cell = new QWidget();
+	auto *layout = new QHBoxLayout(cell);
+	layout->setContentsMargins(2, 0, 2, 0);
+	layout->addWidget(chip, 0, Qt::AlignVCenter | Qt::AlignLeft);
+	return cell;
+}
+
+// Gives a row OBS's icon for it and room for a route chip.
+void decorate(QTreeWidgetItem *item, const QIcon &icon)
+{
+	item->setIcon(ColName, icon);
+	item->setSizeHint(ColWarning, QSize(kWarningWidth, kRowHeight));
 }
 
 std::vector<OBSSceneItem> items_top_first(obs_scene_t *scene)
@@ -137,13 +157,22 @@ CanvasTab::CanvasTab(Controller &controller, std::string key, QWidget *parent)
 	tree_ = new QTreeWidget(this);
 	tree_->setColumnCount(3);
 	tree_->setHeaderLabels({text("Dock.Source"), text("Dock.Route"), QString()});
+	// Every chip is the same width, so the route column is fixed to it.
+	const int chip_width = RouteButton(tree_).sizeHint().width();
 	tree_->header()->setSectionResizeMode(ColName, QHeaderView::Stretch);
-	tree_->header()->setSectionResizeMode(ColRoute, QHeaderView::ResizeToContents);
-	tree_->header()->setSectionResizeMode(ColWarning, QHeaderView::ResizeToContents);
+	tree_->header()->setSectionResizeMode(ColRoute, QHeaderView::Fixed);
+	tree_->header()->setSectionResizeMode(ColWarning, QHeaderView::Fixed);
+	tree_->header()->resizeSection(ColRoute, chip_width + 8);
+	tree_->header()->resizeSection(ColWarning, kWarningWidth);
 	tree_->header()->setStretchLastSection(false);
 	tree_->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	tree_->setContextMenuPolicy(Qt::CustomContextMenu);
 	tree_->setUniformRowHeights(true);
+	tree_->setIconSize(QSize(16, 16));
+	tree_->setIndentation(16);
+	tree_->setAnimated(true);
+	// No dotted focus box around the row a chip was clicked in.
+	tree_->setStyleSheet(QStringLiteral("QTreeWidget { outline: 0; }"));
 	layout->addWidget(tree_, 3);
 
 	disabled_ = new QLabel(text("Dock.CanvasDisabled"), this);
@@ -172,13 +201,23 @@ CanvasTab::CanvasTab(Controller &controller, std::string key, QWidget *parent)
 	layout->addLayout(status_row);
 
 	auto *buttons = new QHBoxLayout();
+	const QColor glyph = palette().color(QPalette::ButtonText);
 	record_ = new QPushButton(this);
+	record_->setIcon(record_icon());
+	record_->setIconSize(QSize(16, 16));
 	pause_ = new QPushButton(this);
+	pause_->setIcon(pause_icon(glyph));
+	pause_->setIconSize(QSize(14, 14));
 	preview_button_ = new QToolButton(this);
 	preview_button_->setText(text("Dock.Preview"));
+	preview_button_->setIcon(preview_icon(glyph));
+	preview_button_->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 	preview_button_->setCheckable(true);
 	auto *settings = new QToolButton(this);
 	settings->setText(text("Dock.Settings"));
+	// OBS's theme gives buttons with this class its gear icon.
+	settings->setProperty("class", QStringLiteral("icon-gear"));
+	settings->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 	buttons->addWidget(record_, 2);
 	buttons->addWidget(pause_, 1);
 	buttons->addWidget(preview_button_);
@@ -326,6 +365,7 @@ void CanvasTab::build_tree()
 		const std::string name = source_name(scene);
 		top->setText(ColName, QString::fromStdString(name));
 		top->setData(ColName, kPathRole, QString::fromStdString("scene:" + source_uuid(scene)));
+		decorate(top, QIcon());
 		QFont font = top->font(ColName);
 		font.setBold(true);
 		top->setFont(ColName, font);
@@ -340,6 +380,7 @@ void CanvasTab::build_tree()
 		auto *section = new QTreeWidgetItem(tree_);
 		section->setText(ColName, text("Dock.AudioDevices"));
 		section->setData(ColName, kPathRole, QStringLiteral("audio-devices"));
+		decorate(section, audio_devices_icon());
 		QFont font = section->font(ColName);
 		font.setBold(true);
 		section->setFont(ColName, font);
@@ -347,6 +388,7 @@ void CanvasTab::build_tree()
 			auto *row = new QTreeWidgetItem(section);
 			row->setText(ColName, QString::fromStdString(source_name(source)));
 			row->setData(ColName, kPathRole, QString::fromStdString("audio:" + source_uuid(source)));
+			decorate(row, source_type_icon(source));
 			add_row(row, source, nullptr, {}, true);
 		}
 		section->setExpanded(first_build || expanded.contains(QStringLiteral("audio-devices")));
@@ -378,6 +420,7 @@ void CanvasTab::add_simple_items(QTreeWidgetItem *parent, obs_scene_t *scene, co
 		obs_source_t *source = obs_sceneitem_get_source(item);
 		auto *tree_item = parent ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(tree_);
 		tree_item->setText(ColName, QString::fromStdString(source_name(source)));
+		decorate(tree_item, source_type_icon(source));
 
 		const char *type = obs_source_get_display_name(obs_source_get_id(source));
 		tree_item->setToolTip(ColName, type ? QString::fromUtf8(type) : QString());
@@ -405,26 +448,20 @@ void CanvasTab::add_simple_row(QTreeWidgetItem *tree_item, obs_source_t *source,
 	// Folders get a button only when it's turned on in Settings; it sets the sources inside.
 	const bool folder = obs_sceneitem_is_group(item);
 	if (!folder || controller_.settings().folder_buttons) {
-		row.placement = new QToolButton(tree_);
-		row.placement->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-		row.placement->setIconSize(QSize(16, 16));
-		row.placement->setMinimumWidth(120);
-		row.placement->setCursor(Qt::PointingHandCursor);
-		row.placement->setContextMenuPolicy(Qt::CustomContextMenu);
-		tree_->setItemWidget(tree_item, ColRoute, row.placement);
-		connect(row.placement, &QToolButton::clicked, this, [this, index, folder]() {
+		row.placement = new RouteButton(tree_);
+		tree_->setItemWidget(tree_item, ColRoute, chip_cell(row.placement));
+		connect(row.placement, &RouteButton::cycleRequested, this, [this, index, folder]() {
 			if (folder)
 				cycle_folder_route(controller_, key_, rows_[index].item);
 			else
 				cycle_placement_route(controller_, key_, rows_[index].item);
 		});
-		connect(row.placement, &QWidget::customContextMenuRequested, this, [this, index](const QPoint &pos) {
-			show_placement_menu(rows_[index], rows_[index].placement->mapToGlobal(pos));
-		});
+		connect(row.placement, &RouteButton::menuRequested, this,
+			[this, index](const QPoint &pos) { show_placement_menu(rows_[index], pos); });
 	}
 
 	row.warning = new QLabel(tree_);
-	row.warning->setMinimumWidth(18);
+	row.warning->setAlignment(Qt::AlignCenter);
 	tree_->setItemWidget(tree_item, ColWarning, row.warning);
 	rows_.push_back(std::move(row));
 }
@@ -461,6 +498,7 @@ void CanvasTab::add_scene_items(QTreeWidgetItem *parent, obs_scene_t *scene, con
 		obs_source_t *source = obs_sceneitem_get_source(item);
 		auto *tree_item = new QTreeWidgetItem(parent);
 		tree_item->setText(ColName, QString::fromStdString(source_name(source)));
+		decorate(tree_item, source_type_icon(source));
 		tree_item->setData(ColName, kPathRole,
 				   parent->data(ColName, kPathRole).toString() + QStringLiteral("/") +
 					   QString::number(obs_sceneitem_get_id(item)));
@@ -498,20 +536,31 @@ void CanvasTab::add_row(QTreeWidgetItem *tree_item, obs_source_t *source, obs_sc
 
 	if (has_route) {
 		row.route = new RouteButton(tree_);
-		tree_->setItemWidget(tree_item, ColRoute, row.route);
+		tree_->setItemWidget(tree_item, ColRoute, chip_cell(row.route));
 		connect(row.route, &RouteButton::cycleRequested, this, [this, index]() { cycle_route(rows_[index]); });
 		connect(row.route, &RouteButton::menuRequested, this,
 			[this, index](const QPoint &pos) { show_route_menu(rows_[index], pos); });
 	}
 
 	row.warning = new QLabel(tree_);
-	row.warning->setMinimumWidth(18);
+	row.warning->setAlignment(Qt::AlignCenter);
 	tree_->setItemWidget(tree_item, ColWarning, row.warning);
 	rows_.push_back(std::move(row));
 }
 
 void CanvasTab::refresh_routes()
 {
+	// Fit the route column to a chip as OBS's theme has styled it.
+	for (const Row &row : rows_) {
+		RouteButton *chip = row.route ? row.route : row.placement;
+		if (!chip)
+			continue;
+		const int width = chip->sizeHint().width() + 8;
+		if (tree_->header()->sectionSize(ColRoute) != width)
+			tree_->header()->resizeSection(ColRoute, width);
+		break;
+	}
+
 	const RouteStore &routes = controller_.routes();
 	for (Row &row : rows_) {
 		if (row.route)
@@ -524,15 +573,11 @@ void CanvasTab::refresh_routes()
 		}
 		if (row.placement && obs_sceneitem_is_group(row.item)) {
 			const FolderRoute route = folder_route(controller_, key_, row.item);
-			row.placement->setIcon(route_icon(route.route, route.mixed));
-			row.placement->setText(route.mixed ? text("Folder.Mixed") : route_label(route.route));
-			row.placement->setToolTip(folder_tooltip(route));
+			row.placement->set_placement(route.route, route.mixed, folder_tooltip(route));
 			row.placement->setEnabled(!route.locked && !route.empty);
 		} else if (row.placement) {
 			const PlacementRoute route = placement_route(controller_, key_, row.item);
-			row.placement->setIcon(route_icon(route.route));
-			row.placement->setText(route_label(route.route));
-			row.placement->setToolTip(route_tooltip(route));
+			row.placement->set_placement(route.route, false, route_tooltip(route));
 			row.placement->setEnabled(!route.locked);
 			const QPalette::ColorGroup group = obs_sceneitem_visible(row.item) ? QPalette::Active
 											   : QPalette::Disabled;
@@ -578,8 +623,7 @@ void CanvasTab::refresh_warnings()
 		if (w->shared_track)
 			lines << text("Warning.SharedTrack").arg(track_list(w->tracks));
 
-		row.warning->setText(QStringLiteral("⚠"));
-		row.warning->setStyleSheet(QStringLiteral("color: #d9a441;"));
+		row.warning->setPixmap(warning_icon().pixmap(QSize(16, 16), row.warning->devicePixelRatioF()));
 		row.warning->setToolTip(lines.join(QStringLiteral("\n\n")));
 		count++;
 	}
@@ -607,6 +651,10 @@ void CanvasTab::refresh_state()
 	const bool stopping = state == PipelineState::Stopping;
 
 	record_->setText(recording || stopping ? text("Dock.Stop") : text("Dock.Start"));
+	if (record_->property("showsStop").toBool() != (recording || stopping)) {
+		record_->setProperty("showsStop", recording || stopping);
+		record_->setIcon(recording || stopping ? stop_icon() : record_icon());
+	}
 	record_->setEnabled(!stopping && (recording || canvas_enabled));
 	pause_->setText(state == PipelineState::Paused ? text("Dock.Resume") : text("Dock.Pause"));
 	pause_->setEnabled(recording);
@@ -692,13 +740,13 @@ void CanvasTab::show_route_menu(const Row &row, const QPoint &pos)
 	QMenu menu(this);
 	menu.addSection(text("Menu.Everywhere"));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		menu.addAction(RouteButton::label(r), this,
+		menu.addAction(route_icon(r), route_label(r), this,
 			       [apply, &routes, source, r]() { apply([&]() { routes.set_video("", source, r); }); });
 	}
 
 	QMenu *canvas_menu = menu.addMenu(text("Menu.OnlyCanvas").arg(canvas_name));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		canvas_menu->addAction(RouteButton::label(r), this, [this, apply, &routes, source, r]() {
+		canvas_menu->addAction(route_icon(r), route_label(r), this, [this, apply, &routes, source, r]() {
 			apply([&]() { routes.set_video(key_, source, r); });
 		});
 	}
@@ -710,7 +758,7 @@ void CanvasTab::show_route_menu(const Row &row, const QPoint &pos)
 	if (item) {
 		QMenu *item_menu = menu.addMenu(text("Menu.OnlyItem").arg(QString::fromStdString(row.scene_name)));
 		for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-			item_menu->addAction(RouteButton::label(r), this, [apply, &routes, item, r]() {
+			item_menu->addAction(route_icon(r), route_label(r), this, [apply, &routes, item, r]() {
 				apply([&]() { routes.set_item_video(item, r); });
 			});
 		}
@@ -778,7 +826,7 @@ void CanvasTab::show_tree_menu(const QPoint &pos)
 
 	menu.addSection(text("Menu.Selected").arg(selected.size()));
 	for (Route r : {Route::Both, Route::StreamOnly, Route::RecordingOnly, Route::Off}) {
-		menu.addAction(RouteButton::label(r), this, [this, &routes, selected, r]() {
+		menu.addAction(route_icon(r), route_label(r), this, [this, &routes, selected, r]() {
 			change_routes(controller_, [&]() {
 				for (auto &s : selected)
 					routes.set_video("", s, r);

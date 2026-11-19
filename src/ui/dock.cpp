@@ -6,6 +6,7 @@
 #include "core/controller.hpp"
 #include "core/pipeline.hpp"
 #include "ui/canvas-tab.hpp"
+#include "ui/icons.hpp"
 
 #include <obs-module.h>
 #include <obs.hpp>
@@ -51,6 +52,8 @@ Dock::Dock(Controller &controller, QWidget *parent) : QWidget(parent), controlle
 	profiles_->setToolTip(text("Dock.ProfileHelp"));
 	profile_menu_ = new QToolButton(this);
 	profile_menu_->setText(QStringLiteral("⋯"));
+	// OBS's theme gives this class its "more" icon; without one, the button shows its text.
+	profile_menu_->setProperty("class", QStringLiteral("icon-dots-vert"));
 	profile_menu_->setToolTip(text("Dock.ProfileMenu"));
 	top->addWidget(enabled_);
 	top->addStretch(1);
@@ -87,6 +90,7 @@ Dock::Dock(Controller &controller, QWidget *parent) : QWidget(parent), controlle
 	layout->addWidget(empty_);
 
 	all_ = new QPushButton(this);
+	all_->setIconSize(QSize(16, 16));
 	layout->addWidget(all_);
 
 	connect(enabled_, &QCheckBox::toggled, this, [this](bool checked) { controller_.set_enabled(checked); });
@@ -212,6 +216,7 @@ void Dock::refresh_all_button()
 		any = any || p->recording();
 	all_->setVisible(pipelines.size() > 1);
 	all_->setText(any ? text("Dock.StopAll") : text("Dock.StartAll"));
+	all_->setIcon(any ? stop_icon() : record_icon());
 }
 
 void Dock::refresh_profiles()

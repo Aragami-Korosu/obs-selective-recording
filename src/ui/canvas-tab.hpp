@@ -50,8 +50,8 @@ private:
 		std::string uuid;
 		std::string scene_name;
 		QTreeWidgetItem *tree_item = nullptr;
-		RouteButton *route = nullptr;     // advanced view: video and audio together
-		QToolButton *placement = nullptr; // simple view
+		RouteButton *route = nullptr;     // All scenes view: the source's route
+		RouteButton *placement = nullptr; // current-scene view: the placement's route
 		QLabel *warning = nullptr;
 	};
 

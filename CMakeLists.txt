@@ -77,6 +77,8 @@ target_sources(
     src/ui/canvas-tab.hpp
     src/ui/dock.cpp
     src/ui/dock.hpp
+    src/ui/icons.cpp
+    src/ui/icons.hpp
     src/ui/preview-widget.cpp
     src/ui/preview-widget.hpp
     src/ui/record-button.cpp

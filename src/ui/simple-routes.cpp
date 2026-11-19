@@ -3,41 +3,45 @@
 
 #include "ui/simple-routes.hpp"
 
+#include "ui/icons.hpp"
+
 #include <obs-module.h>
 
 #include <QPainter>
 #include <QPixmap>
 
-#include <algorithm>
-
 namespace selective_recording {
 
 namespace {
 
-const QColor kStream(77, 160, 230);
-const QColor kRecord(232, 72, 72);
-const QColor kOff(140, 140, 140);
-const QColor kMixed(240, 180, 60);
+// Glyphs are designed on a 24×24 grid and drawn at each size an icon is shown at, so they stay
+// sharp in OBS's Sources list (16 px) and on high-DPI screens.
+constexpr double kGrid = 24.0;
+const QPointF kCentre(12, 12);
 
-void draw_dot(QPainter &p, const QPointF &c, double radius, const QColor &color)
+void dot(QPainter &p, const QPointF &c, double radius, const QColor &color)
 {
 	p.setPen(Qt::NoPen);
 	p.setBrush(color);
 	p.drawEllipse(c, radius, radius);
 }
 
-// Broadcast symbol: two pairs of radio-wave arcs either side of the centre.
-void draw_waves(QPainter &p, const QPointF &c, double half, const QColor &color)
+QPen stroke(const QColor &color, double width)
 {
-	QPen pen(color, std::max(1.5, half * 0.2));
+	QPen pen(color, width);
 	pen.setCapStyle(Qt::RoundCap);
-	p.setPen(pen);
+	return pen;
+}
+
+// "On air": two pairs of radio waves either side of the centre.
+void waves(QPainter &p, const QColor &color)
+{
+	p.setPen(stroke(color, 2.1));
 	p.setBrush(Qt::NoBrush);
-	for (double scale : {0.52, 0.9}) {
-		const double rad = half * scale;
-		const QRectF arc(c.x() - rad, c.y() - rad, rad * 2, rad * 2);
-		p.drawArc(arc, -45 * 16, 90 * 16);
-		p.drawArc(arc, 135 * 16, 90 * 16);
+	for (double radius : {5.6, 9.8}) {
+		const QRectF arc(kCentre.x() - radius, kCentre.y() - radius, radius * 2, radius * 2);
+		p.drawArc(arc, -38 * 16, 76 * 16);
+		p.drawArc(arc, 142 * 16, 76 * 16);
 	}
 }
 
@@ -47,44 +51,42 @@ QPixmap paint_icon(Route route, bool mixed, int size)
 	pixmap.fill(Qt::transparent);
 	QPainter p(&pixmap);
 	p.setRenderHint(QPainter::Antialiasing);
-
-	const QPointF c(size / 2.0, size / 2.0);
-	const double half = size / 2.0 - 1.0;
+	p.scale(size / kGrid, size / kGrid);
 
 	switch (route) {
 	case Route::StreamOnly:
-		draw_waves(p, c, half, kStream);
-		draw_dot(p, c, half * 0.22, kStream);
+		// On air, not recorded: waves around a small blue dot.
+		waves(p, colors::kStream);
+		dot(p, kCentre, 2.6, colors::kStream);
 		break;
-	case Route::RecordingOnly: {
-		// Record button: a ring with a solid centre.
-		QPen pen(kRecord, std::max(1.2, half * 0.15));
-		p.setPen(pen);
+	case Route::RecordingOnly:
+		// A record button: ring and solid centre.
+		p.setPen(stroke(colors::kRecord, 1.9));
 		p.setBrush(Qt::NoBrush);
-		p.drawEllipse(c, half * 0.82, half * 0.82);
-		draw_dot(p, c, half * 0.45, kRecord);
+		p.drawEllipse(kCentre, 9.3, 9.3);
+		dot(p, kCentre, 5.3, colors::kRecord);
 		break;
-	}
 	case Route::Both:
-		// Broadcasting and recording: radio waves around a record dot.
-		draw_waves(p, c, half, kStream);
-		draw_dot(p, c, half * 0.32, kRecord);
+		// On air and recorded: waves around a record dot.
+		waves(p, colors::kStream);
+		dot(p, kCentre, 3.6, colors::kRecord);
 		break;
-	case Route::Off: {
+	case Route::Off:
 		// Not recorded: a slashed circle.
-		QPen pen(kOff, std::max(1.2, half * 0.15));
-		pen.setCapStyle(Qt::RoundCap);
-		p.setPen(pen);
+		p.setPen(stroke(colors::kOff, 2.0));
 		p.setBrush(Qt::NoBrush);
-		p.drawEllipse(c, half * 0.78, half * 0.78);
-		const double d = half * 0.55;
-		p.drawLine(QPointF(c.x() - d, c.y() + d), QPointF(c.x() + d, c.y() - d));
+		p.drawEllipse(kCentre, 8.8, 8.8);
+		p.drawLine(QPointF(5.8, 18.2), QPointF(18.2, 5.8));
 		break;
-	}
 	}
 
-	if (mixed)
-		draw_dot(p, QPointF(size - half * 0.3 - 0.5, half * 0.3 + 0.5), half * 0.3, kMixed);
+	if (mixed) {
+		// An amber badge with a cut-out edge, so it reads against the glyph underneath.
+		p.setCompositionMode(QPainter::CompositionMode_Clear);
+		dot(p, QPointF(19.5, 4.5), 5.0, Qt::transparent);
+		p.setCompositionMode(QPainter::CompositionMode_SourceOver);
+		dot(p, QPointF(19.5, 4.5), 3.6, colors::kMixed);
+	}
 	return pixmap;
 }
 
@@ -93,7 +95,7 @@ QPixmap paint_icon(Route route, bool mixed, int size)
 QIcon route_icon(Route route, bool mixed)
 {
 	QIcon icon;
-	for (int size : {16, 20, 32})
+	for (int size : {16, 20, 24, 32, 48})
 		icon.addPixmap(paint_icon(route, mixed, size));
 	return icon;
 }
