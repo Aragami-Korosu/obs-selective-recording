@@ -15,7 +15,7 @@ What's new in each version. The format follows [Keep a Changelog](https://keepac
 - **Set each placement separately.** The same source in two scenes can be set differently.
 - **Dual output:** use separate selective recordings for your horizontal and [Aitum Vertical](https://github.com/Aitum/obs-vertical-canvas) canvases, at the same time. The buttons also appear in the Vertical Sources dock.
 - **Sound goes with the source**, as in Streamlabs: a Stream only source's sound stays out of the recording, and a Recording only source's sound is in it. Mic and desktop audio have their own button, and any source can have its own recording volume.
-- **A dock** with a simple view of the current scene, and an Advanced view for audio devices, per-canvas settings and **Off**. Recording only works the same there as with the Sources-list buttons.
+- **A dock** showing the current scene, and an **All scenes** view for mic and desktop audio, per-canvas settings and **Off**. Recording only works the same there as with the Sources-list buttons.
 - **Recording settings per canvas:** encoder (NVENC, AMD, QuickSync or x264), quality or bitrate, resolution, frame rate, folder, and MKV, MP4 or MOV.
 - **Pause and resume, hotkeys, and a live preview** of exactly what's being recorded.
 - **Warnings** when a source you meant to keep off the stream is still live.

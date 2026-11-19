@@ -11,7 +11,7 @@ End-to-end tests that run the real plugin inside a disposable, portable OBS. The
 
 | Area | Checks |
 | --- | --- |
-| Routing | Every route; audio following video; Recording only from the Advanced view and placements; nested scenes; groups; recording gain; disabled mode |
+| Routing | Every route; audio following video; Recording only from the All scenes view and placements; nested scenes; groups; recording gain; disabled mode |
 | Stream protection | Original scene items unchanged on both canvases; live screenshots unchanged |
 | Dual output | Aitum Vertical at 1080×1920; both canvases recording at once; canvas recreated after a collection switch |
 | Following OBS | Scene switches; mid-fade blending; Studio Mode with Duplicate Scene; deleting a source while recording; scene collection switch while recording |

@@ -471,7 +471,7 @@ def test_placements(h):
 
 def test_audio_follows_video(h):
     """One route per source: sound goes with the video, and Recording only leaves the stream (ADR-0010)."""
-    print("Audio follows video; Recording only from the dock's Advanced view")
+    print("Audio follows video; Recording only from the dock's All scenes view")
     obs = h.obs
     obs.call("CreateScene", {"sceneName": "SR Audio"}, allow_fail=True)
     h.color("SR Box Adv", CYAN, 300, 300)
@@ -486,15 +486,15 @@ def test_audio_follows_video(h):
     def visible(item_id):
         return obs.vendor("GetItemRoute", {"scene_name": "SR Audio", "item_id": item_id})["visible"]
 
-    # The dock's Advanced view and SetRoute set the source as a whole.
+    # The dock's All scenes view and SetRoute set the source as a whole.
     obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": "recording_only"})
-    check("Advanced: Recording only hides the source in OBS", visible(box) is False)
+    check("All scenes: Recording only hides the source in OBS", visible(box) is False)
     obs.vendor("SetItemRoute", {"scene_name": "SR Audio", "item_id": tone, "video": "stream_only"})
     obs.call("SetCurrentProgramScene", {"sceneName": "SR Audio"})
     time.sleep(1)
 
     path = h.record("main", 4)
-    check("Advanced: recording-only source recorded", media.pixel(path, 1.5, 250, 250) == "cyan",
+    check("All scenes: recording-only source recorded", media.pixel(path, 1.5, 250, 250) == "cyan",
           media.pixel(path, 1.5, 250, 250))
     check("live: recording-only source off the stream", h.live_color("SR Audio", 250, 250) == "red")
     level = media.tone_levels(path, [440], start=0.8, duration=2.0)[440]
@@ -507,7 +507,7 @@ def test_audio_follows_video(h):
     check("Both placement: its sound recorded", level > -6, f"{level:.1f} dB")
 
     obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": "both"})
-    check("Advanced: back to Both shows the source again", visible(box) is True)
+    check("All scenes: back to Both shows the source again", visible(box) is True)
     obs.vendor("SetRoute", {"source_name": "SR Box Adv", "video": ""})
     obs.call("SetCurrentProgramScene", {"sceneName": "SR Test A"})
     time.sleep(1)

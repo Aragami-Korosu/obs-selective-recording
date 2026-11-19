@@ -116,8 +116,8 @@ CanvasTab::CanvasTab(Controller &controller, std::string key, QWidget *parent)
 	filter_->addItem(text("Filter.RecordingOnly"), FilterRecordingOnly);
 	filter_->addItem(text("Filter.Warnings"), FilterWarnings);
 	mode_button_ = new QToolButton(this);
-	mode_button_->setText(text("Simple.Advanced"));
-	mode_button_->setToolTip(text("Simple.AdvancedHelp"));
+	mode_button_->setText(text("Dock.AllScenes"));
+	mode_button_->setToolTip(text("Dock.AllScenesHelp"));
 	mode_button_->setCheckable(true);
 	filter_row->addWidget(search_, 1);
 	filter_row->addWidget(filter_);
@@ -451,7 +451,7 @@ void CanvasTab::show_placement_menu(const Row &row, const QPoint &pos)
 		action->setEnabled(!current.locked);
 	}
 	menu.addSeparator();
-	menu.addAction(text("Simple.Advanced"), this, [this]() { mode_button_->setChecked(true); });
+	menu.addAction(text("Dock.AllScenes"), this, [this]() { mode_button_->setChecked(true); });
 	menu.exec(pos);
 }
 

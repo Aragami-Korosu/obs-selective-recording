@@ -22,15 +22,15 @@ flowchart TD
 3. **Is the canvas allowed?** Check **Settings → (canvas) → Allow selective recording**.
 
 **A source's sound is missing.**
-- In the dock's **Advanced** view, its **Audio** button must be *Stream and recording* or *Recording only*.
-- The source must be in the scene that's recording, or be a global device (Desktop Audio, Mic).
+- Sound goes with the source: the source must be set to *Stream and recording* or *Recording only*, and be in the scene that's recording.
+- Mic and desktop audio from **Settings → Audio** have their own button under **Audio devices** in the dock's **All scenes** view.
 - The recording follows OBS's volume fader, so check it isn't down.
 
 ## Still on stream
 
 **I set a source to Recording only but it's still on stream.**
-- **Set with a button:** the button turns the source's eye off. If it's back on stream, the eye was turned on again. Click the button to *Recording only* again.
-- **Set in the dock's Advanced view:** Advanced settings never change OBS. Turn the source's eye off yourself, and for sound, untick the stream's track in **Edit → Advanced Audio Properties**. The ⚠ in the dock shows what's still live.
+- Choosing Recording only, with a button or in the dock, turns the source's eye off. If it's back on stream, the eye was turned on again. Set it to *Recording only* again.
+- **A mic or desktop audio device** isn't in any scene, so it can't be hidden. Untick the stream's track in **Edit → Advanced Audio Properties**. The ⚠ in the dock shows what's still live.
 
 ## Plugin not showing
 

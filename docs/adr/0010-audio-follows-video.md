@@ -16,8 +16,9 @@ The project owner asked for the Audio column to go, with audio following video, 
 ## Decision
 
 - **One route per source or placement covers video and audio.** The recording takes a source's audio exactly when the source is visible in the recording, meaning it's active in the recording's private canvas ([ADR-0006](0006-private-canvas-rendering.md)). The independent audio mix ([ADR-0004](0004-independent-audio-mix.md)) is unchanged; only its inclusion rule changes.
-- **Audio devices** (Settings → Audio: mic, desktop audio) aren't in any scene, so they keep a route of their own, shown under *Audio devices* in the Advanced view.
-- **Recording only works the same everywhere.** Changing a source's or canvas's route (the Advanced view, or `SetRoute`) applies the placement rule from ADR-0008 to every placement whose route changed. Recording only hides the placement in OBS. Leaving Recording only shows it again, but only if the plugin hid it.
+- **Audio devices** (Settings → Audio: mic, desktop audio) aren't in any scene, so they keep a route of their own, shown under *Audio devices* in the dock's second view.
+- **The Advanced view is renamed All scenes.** With one column it's no more advanced than the normal view; what sets it apart is that it lists every scene, plus the audio devices, Off, per-canvas rules and recording volume.
+- **Recording only works the same everywhere.** Changing a source's or canvas's route (the All scenes view, or `SetRoute`) applies the placement rule from ADR-0008 to every placement whose route changed. Recording only hides the placement in OBS. Leaving Recording only shows it again, but only if the plugin hid it.
 - **Off** still leaves the stream to the user, as before.
 - **Older settings.** A saved audio route is folded in when a scene collection loads. An audio-only source (mic, desktop audio, application audio) keeps it as its one route. For a source with video, the video route wins. `SetRoute` still accepts `audio`, as a name for the same route.
 

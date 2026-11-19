@@ -42,7 +42,7 @@ flowchart LR
 - Each button sets **this source in this scene**. The same source in another scene can be set differently.
 - **Recording only** turns the source's eye off, so it leaves your stream, and keeps it in your recording. Click back to *Stream and recording* and the eye turns on again. If you had turned the eye off yourself first, it stays off.
 - A **locked** source's button is greyed out. Unlock it in OBS to change it.
-- A grey <img src="images/off.svg" width="16"> means the source is set to **Off** in the dock's Advanced view. Click to set it back.
+- A grey <img src="images/off.svg" width="16"> means the source is set to **Off** in the dock's **All scenes** view. Click to set it back.
 
 > **Why does Recording only turn the eye off?** Streamlabs uses its own modified OBS that can show a source on one output only. Standard OBS can't, so the plugin hides it from your stream and adds it back in its own recording copy.
 
@@ -84,12 +84,12 @@ The **Selective Recording** dock opens the first time OBS starts with the plugin
 | **Profile** | Saved sets of choices (**⋯** to add, rename, import, export) |
 | **Settings** | Recording and interface options (see [Settings](#settings)) |
 | **Tabs** | One per canvas: **Main** and **Aitum Vertical** |
-| **Simple view** | The current scene with the same buttons as the Sources list |
-| **Advanced** | Every scene and your audio devices, with per-canvas options and **Off** |
+| **Current scene** (normal view) | The scene on air, with the same buttons as the Sources list |
+| **All scenes** button | Every scene, plus your mic and desktop audio, with **Off**, per-canvas settings and recording volume. Click it again to go back |
 | **Preview** | Shows exactly what's being recorded |
 
 <details>
-<summary><b>Advanced view in detail</b></summary>
+<summary><b>All scenes view in detail</b></summary>
 
 - **Click** a source's button to cycle Both → Stream only → Recording only → Off. It sets the source's video and sound together.
 - **Right-click** for:
@@ -114,10 +114,10 @@ A source's **sound goes with its video.** Set Game Capture to **Stream only**, a
 | --- | --- |
 | Music on stream, not in the recording | Set the music source to **Stream only** |
 | A sound only in the recording | Set the source to **Recording only**. It's hidden in OBS, which mutes it on stream, and the recording keeps its sound |
-| Your mic or desktop audio left out of the recording | Dock → **Advanced** → **Audio devices**, set it to **Stream only** |
-| Louder or quieter in the recording only | Dock → **Advanced**, right-click the source → **Recording volume…** |
+| Your mic or desktop audio left out of the recording | Dock → **All scenes** → **Audio devices**, set it to **Stream only** |
+| Louder or quieter in the recording only | Dock → **All scenes**, right-click the source → **Recording volume…** |
 
-Mic and desktop audio set up in **Settings → Audio** aren't in any scene, so they have their own button under **Audio devices** in the Advanced view. If you set one to **Recording only**, untick it from the stream's track in **Edit → Advanced Audio Properties**; the dock warns you until you do.
+Mic and desktop audio set up in **Settings → Audio** aren't in any scene, so they have their own button under **Audio devices** in the All scenes view. If you set one to **Recording only**, untick it from the stream's track in **Edit → Advanced Audio Properties**; the dock warns you until you do.
 
 ## Warnings ⚠
 

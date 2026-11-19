@@ -51,7 +51,7 @@ bool set_folder_route(Controller &controller, const std::string &canvas, obs_sce
 // Mixed → Both; otherwise the same cycle as a single placement.
 bool cycle_folder_route(Controller &controller, const std::string &canvas, obs_sceneitem_t *folder);
 
-// Runs a change to source or canvas routes (the dock's Advanced view, SetRoute), then applies
+// Runs a change to source or canvas routes (the dock's All scenes view, SetRoute), then applies
 // the same stream rule as a placement to every placement whose route it changed: Recording
 // only hides it in OBS, and leaving Recording only shows it again if the plugin hid it.
 void change_routes(Controller &controller, const std::function<void()> &change);
