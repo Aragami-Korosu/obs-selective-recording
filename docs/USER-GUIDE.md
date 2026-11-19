@@ -95,10 +95,18 @@ The **Selective Recording** dock opens the first time OBS starts with the plugin
 - **Right-click** for:
   - **Every canvas** (normal)
   - **Only on this canvas**, for example to leave a webcam out of the vertical recording only
-  - **Only this placement**, when the same source is in several scenes
+  - **Only in this scene**, when the same source is in several scenes
   - **Recording volume…** (sources with sound)
   - **Reset to default**
-- *Italic* means the profile default. A **•** marks a setting for one canvas or one placement.
+- A badge on a button shows where its setting applies (the key under the list says the same):
+
+  | Badge | Means |
+  | --- | --- |
+  | 📍 Pin | **This scene only.** The same source in other scenes has its own setting. The buttons in OBS's Sources list always set this. |
+  | 🖥 Screen | **This canvas only**, for example just the Aitum Vertical recording |
+  | None | The source everywhere |
+
+  A paler button hasn't been set and uses the default.
 - Select several rows and right-click to change them all.
 - Search and filter: *Left out of recording*, *Recording only*, *Has warnings*.
 - **Recording only** works as it does with the Sources-list buttons: the source is hidden in OBS so it leaves the stream, and shown again when you set it to *Both* or *Stream only*, even if you click through *Off* on the way.

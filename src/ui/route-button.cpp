@@ -99,7 +99,8 @@ void RouteButton::set_route(const ResolvedRoute &route)
 	case RouteOrigin::ProfileDefault:
 		break;
 	}
-	setToolTip(description(route.route) + QStringLiteral("\n\n") + QString::fromUtf8(obs_module_text(origin_key)) +
+	// Where the setting applies comes first, so the badge explains itself on hover.
+	setToolTip(QString::fromUtf8(obs_module_text(origin_key)) + QStringLiteral("\n\n") + description(route.route) +
 		   QStringLiteral("\n") + QString::fromUtf8(obs_module_text("RouteHelp.Click")));
 	setAccessibleName(chip_label(route.route, false));
 	update();

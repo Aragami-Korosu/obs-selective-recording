@@ -63,6 +63,41 @@ QWidget *chip_cell(QWidget *chip)
 	return cell;
 }
 
+// A key under the All scenes list: what the badges on the chips mean.
+QWidget *make_legend(QWidget *parent)
+{
+	auto *legend = new QWidget(parent);
+	legend->setToolTip(text("Legend.Help"));
+	auto *row = new QHBoxLayout(legend);
+	row->setContentsMargins(4, 0, 4, 0);
+	row->setSpacing(4);
+
+	QColor muted = legend->palette().color(QPalette::WindowText);
+	muted.setAlpha(170);
+	const QString style = QStringLiteral("color: rgba(%1, %2, %3, %4);")
+				      .arg(muted.red())
+				      .arg(muted.green())
+				      .arg(muted.blue())
+				      .arg(muted.alpha());
+
+	auto add = [&](const QIcon &icon, const char *key) {
+		if (!icon.isNull()) {
+			auto *glyph = new QLabel(legend);
+			glyph->setPixmap(icon.pixmap(QSize(13, 13), legend->devicePixelRatioF()));
+			row->addWidget(glyph);
+		}
+		auto *label = new QLabel(text(key), legend);
+		label->setStyleSheet(style);
+		row->addWidget(label);
+		row->addSpacing(10);
+	};
+	add(placement_scope_icon(muted), "Legend.SceneOnly");
+	add(canvas_scope_icon(muted), "Legend.CanvasOnly");
+	add(QIcon(), "Legend.Everywhere");
+	row->addStretch(1);
+	return legend;
+}
+
 // Gives a row OBS's icon for it and room for a route chip.
 void decorate(QTreeWidgetItem *item, const QIcon &icon)
 {
@@ -175,6 +210,9 @@ CanvasTab::CanvasTab(Controller &controller, std::string key, QWidget *parent)
 	tree_->setStyleSheet(QStringLiteral("QTreeWidget { outline: 0; }"));
 	layout->addWidget(tree_, 3);
 
+	legend_ = make_legend(this);
+	layout->addWidget(legend_);
+
 	disabled_ = new QLabel(text("Dock.CanvasDisabled"), this);
 	disabled_->setWordWrap(true);
 	disabled_->setVisible(false);
@@ -253,6 +291,7 @@ void CanvasTab::set_simple(bool simple)
 	}
 	filter_->setVisible(!simple);
 	scene_label_->setVisible(simple);
+	legend_->setVisible(!simple);
 	tree_->headerItem()->setText(ColRoute, simple ? text("Simple.Column") : text("Dock.Route"));
 	rebuild_if_changed(true);
 }

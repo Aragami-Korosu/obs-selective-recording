@@ -90,6 +90,7 @@ private:
 	QLineEdit *search_ = nullptr;
 	QComboBox *filter_ = nullptr;
 	QTreeWidget *tree_ = nullptr;
+	QWidget *legend_ = nullptr; // All scenes view: what the chip badges mean
 	QLabel *warning_summary_ = nullptr;
 	PreviewWidget *preview_ = nullptr;
 	QLabel *state_ = nullptr;
