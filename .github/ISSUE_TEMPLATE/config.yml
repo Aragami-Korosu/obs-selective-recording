@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: 📖 User guide
-    url: https://github.com/Linux-bootloader/obs-selective-recording/blob/main/docs/USER-GUIDE.md
+    url: https://github.com/Aragami-Korosu/obs-selective-recording/blob/main/docs/USER-GUIDE.md
     about: How every feature works.
   - name: 🛠️ Troubleshooting
-    url: https://github.com/Linux-bootloader/obs-selective-recording/blob/main/docs/TROUBLESHOOTING.md
+    url: https://github.com/Aragami-Korosu/obs-selective-recording/blob/main/docs/TROUBLESHOOTING.md
     about: Fixes for common problems.
   - name: 🔒 Security issue
-    url: https://github.com/Linux-bootloader/obs-selective-recording/blob/main/SECURITY.md
+    url: https://github.com/Aragami-Korosu/obs-selective-recording/blob/main/SECURITY.md
     about: Please report security problems privately.

@@ -32,9 +32,9 @@ AppVersion={#ProductVersion}
 AppVerName={#AppName} {#ProductVersion}
 AppPublisher=Aragami Korosu
 AppCopyright=Copyright (C) 2026 Aragami Korosu
-AppPublisherURL=https://github.com/Linux-bootloader/obs-selective-recording
-AppSupportURL=https://github.com/Linux-bootloader/obs-selective-recording/issues
-AppUpdatesURL=https://github.com/Linux-bootloader/obs-selective-recording/releases
+AppPublisherURL=https://github.com/Aragami-Korosu/obs-selective-recording
+AppSupportURL=https://github.com/Aragami-Korosu/obs-selective-recording/issues
+AppUpdatesURL=https://github.com/Aragami-Korosu/obs-selective-recording/releases
 VersionInfoCompany=Aragami Korosu
 UninstallDisplayName={#AppName}
 ; OBS loads plugins from this folder for every user.
