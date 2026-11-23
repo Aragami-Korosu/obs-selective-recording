@@ -136,6 +136,16 @@ packaging\windows\trust-test-certificate.ps1 -Remove   # undo
 
 Other people will still see "Unknown publisher" until the project uses a certificate from a public certificate authority.
 
+### Signed release artifacts
+
+Pushing a version tag such as `1.0.0` starts the release workflow. The workflow creates a draft only after all platform signing credentials are configured:
+
+- Windows: `WINDOWS_SIGNING_PFX` (base64-encoded PFX) and `WINDOWS_SIGNING_PASSWORD`.
+- macOS: `MACOS_SIGNING_CERT` (base64-encoded Developer ID PKCS#12), `MACOS_SIGNING_CERT_PASSWORD`, `MACOS_SIGNING_APPLICATION_IDENTITY`, `MACOS_SIGNING_INSTALLER_IDENTITY`, `MACOS_NOTARIZATION_USERNAME` and `MACOS_NOTARIZATION_PASSWORD`. The keychain password and provisioning profile are optional when applicable.
+- Debian: `DEBIAN_SIGNING_KEY` (base64-encoded ASCII-armored private key) and `DEBIAN_SIGNING_PASSPHRASE`. The release includes detached `.asc` signatures and the public key for verification.
+
+The self-signed Windows test certificate can produce a signature, but Windows does not trust it by default. Use a certificate from a public certificate authority for trusted Windows releases.
+
 ## Testing
 
 The end-to-end tests run the plugin inside a disposable, portable OBS, record through it, and check the files with ffmpeg. See [tests/integration/README.md](../tests/integration/README.md).
