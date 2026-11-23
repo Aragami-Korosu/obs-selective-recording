@@ -2,9 +2,6 @@
 
 Choose which sources go to your **stream**, which go to your **recording**, and which go to both. This applies to video and audio separately, and the scene you stream stays exactly as you built it.
 
-> [!WARNING]
-> **Early development.** The plugin loads in OBS but doesn't route anything yet. Progress is tracked in the [roadmap](docs/ROADMAP.md).
-
 ## What it does
 
 Most streamers want their recording to differ slightly from their live output. You might drop alerts and chat overlays from a YouTube upload, or keep copyrighted music off the VOD while your stream still hears it. OBS Selective Recording adds a dock where you choose what goes into the recording for each source:
