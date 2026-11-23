@@ -9,6 +9,7 @@
 [![Version](https://img.shields.io/badge/version-1.0.0-green)](CHANGELOG.md)
 
 Keep alerts and chat off your YouTube upload. Keep a facecam or "BRB" screen in the recording but off stream. Every source in OBS gets a button, and one click decides where it goes.
+## What it does
 
 ```mermaid
 flowchart LR
