@@ -72,11 +72,12 @@ function Package {
         }
         $PfxPath = Join-Path $env:RUNNER_TEMP 'signing.pfx'
         [IO.File]::WriteAllBytes($PfxPath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX))
-        $SignCommand = "`"${SignTool}`" sign /fd sha256 /f `"${PfxPath}`" /p `"${env:WINDOWS_SIGNING_PASSWORD}`" /tr http://timestamp.digicert.com /td sha256"
+        $SignCommand = "`"${SignTool}`" sign /fd sha256 /f `"${PfxPath}`" /p `"${env:WINDOWS_SIGNING_PASSWORD}`" /tr http://timestamp.digicert.com /td sha256 /timeout 30000"
 
         $Binaries = Get-ChildItem "${ProjectRoot}/release/${Configuration}/${ProductName}/bin/64bit/*.dll"
         foreach ( $Binary in $Binaries ) {
-            & $SignTool sign /fd sha256 /f $PfxPath /p $env:WINDOWS_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td sha256 $Binary.FullName
+            Write-Host "Signing $($Binary.Name) with a 30-second timestamp timeout..."
+            & $SignTool sign /fd sha256 /f $PfxPath /p $env:WINDOWS_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td sha256 /timeout 30000 $Binary.FullName
             if ( $LASTEXITCODE -ne 0 ) {
                 throw "Signing $($Binary.Name) failed"
             }
@@ -91,6 +92,7 @@ function Package {
         DestinationPath = "${ProjectRoot}/release/${OutputName}.zip"
         Verbose = ($Env:CI -ne $null)
     }
+    Write-Host 'Creating Windows ZIP archive...'
     Compress-Archive -Force @CompressArgs
     Log-Group
 
@@ -104,7 +106,8 @@ function Package {
     foreach ( $Part in 'package', 'source' ) {
         $Url = $Vertical.$Part.url
         $File = Join-Path $VerticalWork (Split-Path $Url -Leaf)
-        Invoke-WebRequest -Uri $Url -OutFile $File -UseBasicParsing
+        Write-Host "Downloading bundled Vertical Canvas $Part..."
+        Invoke-WebRequest -Uri $Url -OutFile $File -UseBasicParsing -TimeoutSec 60 -MaximumRetryCount 2 -RetryIntervalSec 5
         $Hash = (Get-FileHash $File -Algorithm SHA256).Hash.ToLower()
         if ( $Hash -ne $Vertical.$Part.sha256 ) {
             throw "Checksum mismatch for ${Url}: got ${Hash}"
@@ -154,9 +157,15 @@ function Package {
     $TestRoot = Join-Path $env:RUNNER_TEMP 'installer-test\plugins'
     $TestApp = Join-Path $TestRoot $ProductName
     $Installer = "${ProjectRoot}/release/${OutputName}-installer.exe"
-    $Setup = Start-Process $Installer -Wait -PassThru -ArgumentList @(
+    $Setup = Start-Process $Installer -PassThru -ArgumentList @(
         '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=`"${TestApp}`"",
         "/LOG=`"$(Join-Path $env:RUNNER_TEMP 'installer-test.log')`"")
+    Write-Host 'Waiting up to 2 minutes for the installer smoke test...'
+    if ( ! $Setup.WaitForExit(120000) ) {
+        Stop-Process -Id $Setup.Id -Force -ErrorAction SilentlyContinue
+        throw 'Installer smoke test timed out after 2 minutes'
+    }
+    $Setup.Refresh()
     $Expected = @(
         "${TestApp}/bin/64bit/${ProductName}.dll"
         "${TestRoot}/vertical-canvas/bin/64bit/vertical-canvas.dll"
@@ -167,7 +176,13 @@ function Package {
         Get-Content (Join-Path $env:RUNNER_TEMP 'installer-test.log') -ErrorAction SilentlyContinue | Out-Host
         throw "Installer test failed (exit $($Setup.ExitCode)); missing: $($Missing -join ', ')"
     }
-    $Uninstall = Start-Process "${TestApp}/unins000.exe" -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES'
+    $Uninstall = Start-Process "${TestApp}/unins000.exe" -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES'
+    Write-Host 'Waiting up to 1 minute for the uninstaller smoke test...'
+    if ( ! $Uninstall.WaitForExit(60000) ) {
+        Stop-Process -Id $Uninstall.Id -Force -ErrorAction SilentlyContinue
+        throw 'Uninstaller smoke test timed out after 1 minute'
+    }
+    $Uninstall.Refresh()
     # The uninstaller copies itself to a temporary folder and returns at once; wait for the files.
     for ( $i = 0; $i -lt 30 -and ( Test-Path $TestApp ); $i++ ) { Start-Sleep 1 }
     if ( $Uninstall.ExitCode -ne 0 -or ( Test-Path $TestApp ) -or
