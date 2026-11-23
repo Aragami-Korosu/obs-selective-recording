@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The project hasn't had a release yet. Once 1.0 ships, only the latest release will receive security fixes.
+Only the latest release receives security fixes.
 
 ## Reporting a vulnerability
 

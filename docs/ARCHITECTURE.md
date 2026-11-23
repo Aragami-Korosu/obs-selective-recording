@@ -1,231 +1,226 @@
 # Architecture
 
-This document describes how OBS Selective Recording works internally. For *what* the plugin does, see the [specification](SPECIFICATION.md).
-
-> Parts of this design depend on the proofs of concept in the [roadmap](ROADMAP.md#proofs-of-concept). Anything marked **(POC)** may change based on what they show.
+This document describes how OBS Selective Recording works internally. For *what* the plugin does, see the [specification](SPECIFICATION.md). Design decisions and their reasons are in the [ADRs](adr/).
 
 ## Overview
 
 ```mermaid
 flowchart TB
     subgraph OBS["OBS Studio"]
-        LIVE["Program scene<br/>(main canvas)"] --> STREAM["Stream / OBS recording<br/>(never modified)"]
-        SRC["Shared sources<br/>game capture, webcam, mic, browser…"]
-        LIVE -.uses.-> SRC
-    end
-
-    subgraph PLUGIN["Selective Recording plugin"]
-        SM["SourceManager"] --> RM["RoutingManager"]
-        RM --> MIRROR["SceneMirror<br/>private scene tree"]
-        RM --> AP["AudioPipeline<br/>capture → mix"]
-        MIRROR -.shares.-> SRC
-        AP -.captures.-> SRC
-        MIRROR --> VP["VideoPipeline<br/>obs_view"]
-        VP --> REC["RecordingController<br/>encoders + output"]
-        AP --> REC
-        VP --> PREV["PreviewController"]
-        SET["SettingsManager"] --> RM
-        DOCK["Dock UI"] <--> RM
-        DOCK <--> REC
-    end
-
-    REC --> FILE[("Recording file")]
-```
-
-The plugin builds a **second, private composition** alongside OBS's own. That composition reuses OBS's capture sources by reference, so nothing is captured twice. It has its own scene containers, video mix, audio mix and encoders.
-
-## Ownership boundary
-
-The plugin only *reads* OBS state, and only *writes* to objects it created. This is the core guarantee of [ADR-0003](adr/0003-stream-exclusion.md) and NFR-001.
-
-| Object | Access |
-| --- | --- |
-| Original scenes and scene items, on any canvas | Read: structure, transforms, visibility. Never written. |
-| Capture sources | Shared by reference into private scenes. Audio is captured read-only. Settings, filters, volume, mute and mixer tracks are never written. |
-| Canvases from OBS or other plugins | Read: scenes, channel 0, video info. Signals are observed. Never written. |
-| Outputs and encoders the plugin didn't create (stream, OBS recording, Vertical's outputs) | Read: active state and audio encoder mixer indexes, used only for warnings. Never started, stopped or modified. |
-| Private scenes, transitions, views, audio mixes, encoders and outputs | Created, owned and destroyed by the plugin |
-
-To enforce this, every code path that writes to OBS goes through types that can only hold plugin-created objects. Phase 2 adds a test that snapshots the original scene state, runs every plugin operation, and checks that nothing changed.
-
-## Multiple canvases
-
-The diagram above shows one canvas. In practice the plugin runs **one selective pipeline per canvas**, so the main horizontal canvas and a vertical canvas from [Aitum Vertical Canvas](https://github.com/Aitum/obs-vertical-canvas) each get their own. See [ADR-0005](adr/0005-multi-canvas-support.md).
-
-```mermaid
-flowchart TB
-    subgraph OBS["OBS Studio"]
-        MAIN["Main canvas<br/>1920×1080"]
-        VERT["'Aitum Vertical' canvas<br/>1080×1920"]
+        MAIN["Main canvas"] --> STREAM1["Stream / OBS recording<br/>(never modified)"]
+        VERT["Aitum Vertical canvas"] --> STREAM2["Vertical stream / recording<br/>(never modified)"]
         SRC["Shared sources"]
         MAIN -.-> SRC
         VERT -.-> SRC
     end
 
-    CM["CanvasManager"] --> PH["Selective pipeline<br/>(horizontal)"]
-    CM --> PV["Selective pipeline<br/>(vertical)"]
-    MAIN -- "frontend scene /<br/>transition events" --> PH
-    VERT -- "channel_change,<br/>transition signals" --> PV
-    RM["RoutingManager<br/>(shared rules +<br/>per-canvas overrides)"] --> PH & PV
-    PH --> F1[("horizontal.mkv")]
-    PV --> F2[("vertical.mkv")]
+    subgraph PLUGIN["Selective Recording"]
+        CTRL["Controller"] --> PM["Pipeline (main)"]
+        CTRL --> PV["Pipeline (vertical)"]
+        RS["RouteStore"] --> PM & PV
+        subgraph PIPE["Each pipeline"]
+            MIRROR["SceneMirror<br/>private canvas + scenes"] --> REC["Recorder<br/>encoders + muxer"]
+            MIX["AudioMixer<br/>per-source capture"] --> REC
+        end
+    end
+
+    MIRROR -.shares.-> SRC
+    MIX -.captures.-> SRC
+    REC --> FILE[("Recording files")]
 ```
 
-Each *selective pipeline* is a `SceneMirror`, `VideoPipeline`, `AudioPipeline` and `RecordingController`, all bound to one canvas. Pipelines share the `RoutingManager` and `SettingsManager`, and never share private scenes or encoders.
+For each canvas, the plugin builds a **second, private composition**. It reuses OBS's sources by reference, so nothing is captured twice, and it has its own scenes, video mix, audio mix, encoders and output.
 
-| Canvas event | Source | Action |
-| --- | --- | --- |
-| `FINISHED_LOADING`, `CANVAS_ADDED` | frontend | Discover canvases and create a pipeline for each enabled one |
-| `CANVAS_REMOVED`, canvas `remove` | frontend, canvas | Stop that pipeline's recording cleanly, keep the file, then tear the pipeline down. Settings are kept (NFR-009, NFR-010). |
-| `channel_change` (channel 0) | canvas | Switch the private program scene, or attach to the new transition |
-| `transition_start` / `transition_stop` | the canvas's transition source | Drive the private transition |
-| `source_add` / `source_remove` | canvas | Add or remove mirrored scenes |
-| `video_reset` | canvas | Update the default recording resolution, applied on the next start |
+## Ownership boundary
 
-The main canvas is followed through frontend events (`SCENE_CHANGED`, `TRANSITION_*`), because OBS's own transition lives outside the canvas channel.
+The plugin only *reads* OBS state, and only *writes* to objects it created ([ADR-0003](adr/0003-stream-exclusion.md), NFR-001).
 
-## Components
+| Object | Access |
+| --- | --- |
+| Original scenes and scene items, on any canvas | Read: structure, transforms, visibility. Never written. |
+| Capture sources | Shared by reference into private scenes. Audio is captured read-only. Never reconfigured. |
+| Canvases owned by OBS or other plugins | Read: scenes, channel 0, video info. Signals are observed. |
+| Outputs and encoders the plugin didn't create | Read: audio tracks, used only for warnings. Never started, stopped or changed. |
+| Private canvas, scenes, groups, transition, audio output, encoders and output | Created, owned and destroyed by the plugin |
 
-Each component owns its own state and exposes a small interface. Components never reach into each other's internals.
+The integration tests check this by snapshotting every original scene item before and after recording on each canvas.
 
-| Component | Directory | Responsibility |
-| --- | --- | --- |
-| `CanvasManager` | `src/core/` | Discovers canvases, tracks additions and removals, and owns one selective pipeline per enabled canvas. |
-| `SourceManager` | `src/core/` | Enumerates scenes (for each canvas), groups, items and audio sources. Emits change events. |
-| `RoutingManager` | `src/core/` | Resolves the effective video and audio route for any source or item. |
-| `SettingsManager` | `src/core/` | Loads, saves and migrates configuration. |
-| `LiveStateMonitor` | `src/core/` | Read-only checks behind the warnings: recording-only sources still live (NFR-008), and audio setups that can't be achieved (NFR-006). |
-| `SceneMirror` | `src/video/` | Builds and maintains the private scene tree from the original scenes. |
-| `VideoPipeline` | `src/video/` | Renders the private program scene into an independent `obs_view` mix. |
-| `PreviewController` | `src/video/` | Draws the recording mix in the dock. Disabled while hidden. |
-| `AudioPipeline` | `src/audio/` | Captures each source's audio, applies routing and gain, and mixes the result. |
-| `RecordingController` | `src/recording/` | Runs the output lifecycle: start, pause, stop and error handling. |
-| `EncoderManager` | `src/recording/` | Discovers available encoders, checks capacity (NFR-007) and builds encoder settings. |
-| `RecoveryManager` | `src/recording/` | Writes session markers and detects interrupted recordings at startup. |
-| `DockController` | `src/ui/` | Qt dock connecting user actions to the engine. |
-| `HotkeyManager` | `src/ui/` | Registers and persists plugin hotkeys. |
+## Source layout
 
-Directories are created as each milestone begins, not before.
+| Directory | Contents |
+| --- | --- |
+| `src/plugin/` | Module entry point. Creates the controller, dock and websocket vendor. |
+| `src/core/` | `Controller`, `Pipeline`, `RouteStore`, `Settings`, live-state warnings, OBS helpers |
+| `src/video/` | `SceneMirror` |
+| `src/audio/` | `AudioMixer` |
+| `src/recording/` | `Recorder`, encoder discovery and presets, recovery markers |
+| `src/ui/` | Dock, canvas tabs, route buttons, preview, settings dialog |
+| `src/api/` | obs-websocket vendor requests |
+| `third-party/` | Vendored `obs-websocket-api.h` |
 
-## Video pipeline
+## Controller
 
-```mermaid
-flowchart LR
-    A["Original scene"] --> B["SceneMirror<br/>(recursive)"]
-    B --> C{"Route for<br/>each item"}
-    C -->|both| D1["Follows original<br/>visibility"]
-    C -->|recording_only| D2["Always visible"]
-    C -->|stream_only / off| E["Always hidden"]
-    D1 & D2 --> D["Mirrored item"]
-    D & E --> F["Private scene"]
-    F --> G["obs_view<br/>(custom video info)"]
-    G --> H["video_t → encoder"]
-```
+`Controller` is a singleton on the UI thread. It:
 
-**Private scene tree.** For each original scene on the pipeline's canvas, the mirror creates a private scene with `obs_scene_create_private`. It adds the *same* `obs_source_t` objects as items, and copies each item's transform, crop, blend mode and order. Visibility depends on the route. A **Both** item follows the original's visibility. A **Recording only** item is always shown, because the user hides the original from the stream. **Stream only** and **Off** items are always hidden. All of this applies only to the mirrored copy. The original item is never touched. Nested scenes and groups are mirrored recursively, so a nested scene item points to the mirrored child scene instead of the original. A nested scene can belong to a different canvas, for example a horizontal scene used inside a vertical one, so the mirror resolves the child from whichever canvas owns it. See [ADR-0002](adr/0002-private-scene-mirror.md).
+- Discovers canvases: the main canvas plus every frontend canvas with video. It does this on `FINISHED_LOADING`, `CANVAS_ADDED`, `CANVAS_REMOVED`, collection changes and every two seconds, because Vertical recreates its canvas on a collection switch without a frontend event.
+- Owns one `Pipeline` for each canvas, and stops a pipeline cleanly when its canvas disappears.
+- Loads and saves routes through the scene collection ([ADR-0007](adr/0007-routes-in-scene-collection.md)), and settings and hotkeys in the plugin config folder.
+- Runs a 250 ms tick. Each tick reconciles pipelines and updates stats. Warnings are recalculated every second.
+- Registers hotkeys for each canvas (start/stop, pause) and one global start/stop.
+- Shuts down at `OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN`. OBS clears all scenes immediately after that event and waits for every reference to be released, so recordings stop and mirrors are destroyed there, not at `EXIT`.
 
-**Rendering.** `obs_view_add2()` adds the private program scene to the render loop with its own `obs_video_info`, which allows a different resolution from the canvas. Frame rate follows the global render loop (POC 1). It returns a `video_t` that the video encoder connects to. See [ADR-0001](adr/0001-obs-view-over-canvas-api.md).
+## Pipeline
 
-**Synchronisation.** The mirror listens to these signals instead of polling:
-
-| Signal | Source | Mirror action |
-| --- | --- | --- |
-| `item_add`, `item_remove` | scene | Add or remove the mirrored item |
-| `reorder`, `refresh` | scene | Re-sync item order |
-| `item_transform` | scene | Copy the transform |
-| `item_visible` | scene | Re-evaluate the route and visibility |
-| `rename` | source | Update the inventory |
-| `remove`, `destroy` | source | Release mirrored references |
-| `SCENE_CHANGED` | frontend | Switch the private program scene |
-| `SCENE_COLLECTION_CHANGING` / `CHANGED` | frontend | Tear down, then rebuild |
-| `TRANSITION_*` | frontend | Drive the private transition |
-
-**Transitions (POC).** The view renders a private transition source whose type and duration match the active OBS transition. Its endpoints are the mirrored scenes. Hard cuts come first. In Studio Mode, the mirror follows the program scene only.
-
-## Audio pipeline
-
-```mermaid
-flowchart LR
-    S1["Mic"] & S2["Game"] & S3["Discord"] & S4["Music"] --> CB["audio capture<br/>callbacks"]
-    CB --> BUF["Per-source<br/>timestamped buffers"]
-    BUF --> MIX["Mixer<br/>route · gain · mute · resample"]
-    MIX --> OUT["audio_t<br/>(recording only)"]
-    OUT --> AENC["Audio encoder"]
-```
-
-- `obs_source_add_audio_capture_callback()` delivers each source's audio and its mute state on the audio thread.
-- Each source writes into its own ring buffer, keyed by timestamp. The mixer pulls an aligned window from every routed source, rather than mixing samples as callbacks happen to arrive.
-- The mixed result goes to a plugin-owned `audio_t`. The mix never reads from or writes to OBS's six mixer tracks, so the user's track setup doesn't limit what can be recorded.
-- Each canvas pipeline registers its own capture callbacks and keeps its own buffers. Tearing down one pipeline never affects another.
-- **(POC)** It hasn't been confirmed which OBS mixer stages (volume, balance, sync offset, push-to-talk, filters) are already applied when the callback runs. The plugin must match OBS for any stage that isn't. See [ADR-0004](adr/0004-independent-audio-mix.md).
-
-## Recording engine
+A `Pipeline` belongs to one canvas and owns everything it uses, so failures stay inside it (NFR-002, NFR-003):
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
-    Idle --> Preparing: start
-    Preparing --> Recording: output started
-    Preparing --> Error: encoder or output failure
+    Idle --> Recording: start
+    Idle --> Failed: start error
     Recording --> Paused: pause
     Paused --> Recording: resume
     Recording --> Stopping: stop
     Paused --> Stopping: stop
-    Recording --> Failed: output stops with an error
-    Paused --> Failed: output stops with an error
     Stopping --> Idle: output stopped
-    Failed --> Idle: resources released, error reported
-    Error --> Idle: reset
+    Recording --> Failed: output stops with an error
+    Failed --> Idle: start again or dismiss
 ```
 
-This state machine runs separately for each canvas.
+- The `SceneMirror` and `AudioMixer` exist only while a recording or preview is running.
+- If a hardware encoder fails to start, or fails within five seconds of starting (usually because it ran out of sessions), the pipeline retries once with x264, unless that's turned off (NFR-007).
+- Output stop codes become clear messages, such as disk full, encoder failure or unsupported format.
+- A recovery marker is written when a recording starts and removed when it stops cleanly (FR-009).
 
-For each canvas, the plugin creates its own `ffmpeg_muxer` output and its own video and audio encoders. It connects them to that pipeline's private `video_t` and `audio_t`. OBS's own outputs are never touched, and neither are another plugin's outputs, such as Vertical's stream, recording and replay buffer.
+## Video: the scene mirror
 
-Before starting, the controller checks that the chosen encoder can open another session. With dual streaming plus two selective recordings, hardware encoder session limits can be reached. If that happens, recording fails with a clear message, and the live streams are left untouched.
+`SceneMirror` renders through a private canvas ([ADR-0006](adr/0006-private-canvas-rendering.md)):
 
-## Failure isolation
+- **Base resolution:** the source canvas's base resolution.
+- **Output resolution:** the recording resolution.
+- **Flags:** `ACTIVATE | EPHEMERAL`. There's no `MIX_AUDIO`, so nothing reaches OBS's tracks.
 
-Each canvas pipeline is a separate failure domain (NFR-002, NFR-003).
+```mermaid
+flowchart LR
+    A["Original scene"] --> P["Plan<br/>(reads originals only)"]
+    P --> B["Private scene<br/>in private canvas"]
+    B --> T["Private transition<br/>(manual time)"]
+    T --> C["Private canvas mix"]
+    C --> E["video_t → encoder"]
+```
 
-- **Nothing shared that can fail.** Pipelines share only read-only configuration and the routing rules. Encoders, outputs, views, private scenes and audio buffers all belong to one pipeline.
-- **Failures are detected from the output.** The `RecordingController` listens to its own output's `stop` signal. A non-zero code (`OBS_OUTPUT_ERROR`, `OBS_OUTPUT_NO_SPACE`, `OBS_OUTPUT_ENCODE_ERROR` and so on) moves that pipeline to **Failed**. That pipeline then releases its encoders and view and reports the cause. Other pipelines and every stream keep running.
-- **Failures never reach other outputs.** Error handling only ever calls functions on objects the pipeline owns, so a failure path can't stop a stream.
-- **No exceptions cross into libobs.** Every callback the plugin registers catches all C++ exceptions at its boundary, logs them, and marks only the owning pipeline as failed.
-- **Process-level limits.** A crash in plugin code still crashes OBS. Isolation reduces how often that can happen, but can't prevent it. Phase 7's fault-injection and long-run tests cover this.
+**Building.** Every scene on the canvas is mirrored when the pipeline starts.
+- **Nested scenes** point to their own mirror, so routes apply inside them.
+- **Groups** are rebuilt as private `group` sources. Group resizing is deferred until all children are added.
+- **Item properties copied:** transform (absolute, via `get_info2`/`set_info2`), crop, scale filter, blending method and blending mode.
+- **Locking:** a rebuild reads the original tree first and only then locks the mirror with `obs_scene_atomic_update`. The lock order is always original → mirror.
 
-## Live-state warnings
+**Visibility of each mirrored item:**
 
-`LiveStateMonitor` evaluates the warnings defined in [ADR-0003](adr/0003-stream-exclusion.md). It recalculates them on the same scene signals the mirror uses, and on output start and stop. It doesn't poll.
+| Route | Mirrored item |
+| --- | --- |
+| Both | Follows the original's visibility |
+| Recording only | Always visible |
+| Stream only, Off | Always hidden |
+| Plugin disabled | Follows the original's visibility |
 
-- **Video (NFR-008).** For each **Recording only** or **Off** source, it walks the scenes on air on that canvas, following groups and nested scenes. It warns if any path to the source is visible.
-- **Audio (NFR-008, NFR-006).** It finds the stream outputs for each canvas: `obs_frontend_get_streaming_output()` for the main canvas, and for other canvases, outputs whose video encoder uses that canvas's `video_t`. It reads each output's audio encoder mixer indexes and compares them with the source's mixer flags. A **Recording only** source on one of those tracks raises a warning. If the user can't fix it without affecting another canvas's stream, because both streams share a track, the warning explains that instead.
+**Keeping in sync:**
 
-## Recovery
+| Signal | Handling |
+| --- | --- |
+| `item_transform` (scenes and groups) | Copied immediately on the emitting thread, so animated transforms stay frame-accurate. `set_info2` takes no scene locks. |
+| `item_add`, `item_remove`, `reorder`, `refresh` | The owning scene is marked for a rebuild on the UI thread |
+| `item_visible` | Visibility re-evaluated on the UI thread |
+| Canvas `source_add` / `source_remove` | Mirrors added or dropped |
+| Global `source_remove` | Every mirror that uses the source is rebuilt, so deleted sources are released immediately |
 
-`RecoveryManager` writes a small session marker when a recording starts and deletes it when the recording stops cleanly. The marker records the canvas, file path, container and start time.
+**Transitions.** A graphics-thread tick reads channel 0 of the original canvas:
+- If it holds a transition, the private transition is started in manual mode between the mirrored A and B scenes. Its progress is copied from `obs_transition_get_time()` every frame. This covers fades, stingers, Vertical's per-scene overrides and the Studio Mode T-bar.
+- Studio Mode's *Duplicate Scene* puts a private copy of a scene on air. The tick maps it to the mirror of the scene with the same name straight away. Within 250 ms the copy gets its own mirror, which is released once it leaves the air.
 
-At startup, any leftover marker means a recording was interrupted. The dock lists those files and offers to remux them. Because MKV is the default, the file up to the crash stays playable. POC 3 will check whether OBS's crash-resilient MP4 mode can be used when MP4 is selected.
+## Audio: the mixer
 
-On `OBS_FRONTEND_EVENT_EXIT`, every active pipeline stops and finalises before the module unloads. A clean stop always removes the marker.
+`AudioMixer` builds the recording audio from individual sources ([ADR-0004](adr/0004-independent-audio-mix.md)).
+
+1. **Candidates.** Each tick works out which sources can contribute: global audio devices, sources on air in the original program, and sources on air in the mirror.
+2. **Inclusion.** Audio follows video ([ADR-0010](adr/0010-audio-follows-video.md)). A source is included while it's active in the mirror, meaning one of its placements is visible in the recording. An audio device isn't in any scene, so it's included when its own route is Both or Recording only.
+3. **Capture.** Each included source gets a capture callback. The callback re-applies libobs's timestamp rules and sync offset, then writes the audio into a three-second ring buffer at its timestamp. Muted audio is written as silence.
+4. **Mixing.** The `audio_t` callback mixes one 1,024-frame window at a time. Each source is scaled by its OBS fader and its recording gain, and a soft limiter keeps peaks below full scale.
+5. **Buffering.** The output window trails real time by a buffer that starts at 64 ms. When a source arrives late, the buffer grows by skipping a block, exactly as libobs does.
+
+## Recording
+
+`Recorder` creates its own video encoder, audio encoder and output:
+- **MKV and MOV** use `ffmpeg_muxer`.
+- **MP4** uses OBS's crash-resilient `mp4_output` where it's available.
+
+The output's `stop` signal reports the outcome. The callback is copied before it runs, because the owner may destroy the recorder from inside it.
+
+Encoder presets:
+
+| Encoder | Constant quality | Constant bitrate |
+| --- | --- | --- |
+| x264 | CRF, veryfast | CBR |
+| NVENC | CQP, p5 | CBR |
+| AMF, QuickSync | CQP | CBR |
+
+## Sources-list buttons
+
+`SourceListButtons` adds a button to each row of OBS's own Sources list (`QListView` named `sources`, class `SourceTree`). There's no public API for this. To stay safe:
+- Every 400 ms, and after every scene change, it rebuilds the list's order using OBS's rule: top item first, with expanded group children under their group.
+- It only touches a row when the row count matches and the row's label shows that source's name.
+- It inserts a `QToolButton` into the row's layout, before the visibility checkbox. OBS recreates rows often, so missing buttons are simply added again.
+- A button stores only the scene UUID and item ID, and resolves the item when clicked.
+- If OBS's list changes in a future version, the buttons stop appearing and nothing else breaks.
+
+A click goes through `core/placement` ([ADR-0008](adr/0008-streamlabs-style-placements.md)), which is shared with the dock's simple view and `SetItemRoute`:
+- It sets the placement's video as an item override, kept only where it differs from what the source inherits.
+- For Recording only it also hides the scene item, marking it in the item's private settings, and it shows the item again later only if that mark is there.
+- Each placement with a route carries its key in its scene item's private settings. libobs copies private settings into Studio Mode's duplicate, so the copy OBS puts on air finds the original's route without the plugin searching scenes (an earlier position-matching approach enumerated scenes that OBS could be destroying, and crashed).
+
+Other canvases' Sources lists get the same buttons. Aitum Vertical's "Vertical Sources" dock uses its own copy of OBS's `SourceTree` class with the same row layout and order, but the plugin can't ask it which scene it shows. So every 2 s it looks for `SourceTree` views other than `sources`, and identifies each one by its rows: it tries every extra canvas's on-air scene (both sides of a running transition), then the canvas's other scenes, and uses the first whose items match the rows. Those buttons store their canvas key, so the route is read and set on that canvas.
+
+## Record button
+
+`RecordButtonTakeover` makes OBS's Record button (`recordButton` in the Controls dock) start and stop the selective recordings ([ADR-0009](adr/0009-record-button.md)):
+- It installs an event filter on the button and swallows its mouse and keyboard activation, so OBS's own `RecordButtonClicked` never runs and OBS's recording output is never started.
+- A click toggles every enabled canvas (`Controller::toggle_all`), and the button's text and checked state follow the selective recordings, re-applied every 300 ms.
+- While OBS's own recording is active (its hotkey, obs-websocket), events pass through so OBS can stop it, and the plugin leaves the button to OBS.
+- The setting `record_button` turns it off; the button is then restored to OBS's own state.
+
+## Folders
+
+Folders (groups) have no route of their own ([ADR-0008](adr/0008-streamlabs-style-placements.md)). `RouteStore::resolve_video` returns Both for a group source or group item, so a folder always follows its eye. Folder routes saved by earlier versions are dropped in `remove_missing_sources`, and a folder the plugin had hidden is shown again. With `folder_buttons` on, a folder's button calls `set_folder_route`, which sets every unlocked source inside in one change.
+
+## Warnings
+
+`evaluate_warnings()` reads OBS state and changes nothing:
+- **Video:** it walks the scene on air on each canvas and flags visible items whose route is Recording only or Off.
+- **Audio:** it compares each source's mixer flags with the tracks used by that canvas's stream. On the main canvas it reads the streaming output, or the profile settings if there isn't one. On other canvases it looks for outputs whose video encoder reads that canvas.
+- **Shared tracks:** if removing a source from a track would also remove it from another canvas's stream that should keep it, the dock explains that conflict (NFR-006).
 
 ## Threading
 
 | Thread | What runs there |
 | --- | --- |
-| UI (Qt main) | Dock, frontend events and settings |
-| Graphics | `obs_view` rendering and preview drawing |
-| Audio | Capture callbacks. These must not block or allocate in the hot path. |
-| Output | Encoder and muxer callbacks |
+| UI (Qt main) | Controller, pipelines, routes, mirror rebuilds, dock |
+| Graphics | Transition tick, preview drawing |
+| Scene signal threads | Transform copies (no locks other than the link map) |
+| Source audio threads | Capture callbacks (short per-source lock) |
+| Recording audio thread | Mixing |
+| Output threads | Stop callbacks, which post to the UI thread |
+| obs-websocket | Vendor requests, which run synchronously on the UI thread |
 
-Scene and source signals can fire from any thread. Handlers only collect changes and send them to the UI thread, which owns the mirror state.
+Signal handlers hand work to the UI thread together with a weak "alive" token. Work posted after an object is destroyed is dropped.
 
 ## Reference ownership
 
-- Every `obs_source_t`, `obs_scene_t` and `obs_sceneitem_t` the plugin holds uses the RAII wrappers from `obs.hpp` (`OBSSourceAutoRelease` and similar). Raw pointers are borrowed only for the duration of a call.
-- When a source is removed (`remove` signal), the plugin drops every mirrored reference to it immediately, so OBS can destroy the source even while a recording is running.
-- On `OBS_FRONTEND_EVENT_EXIT`, the plugin stops the output, tears down the mirror and removes every callback, all before `obs_module_unload` runs.
+- Every OBS object the plugin holds uses the RAII wrappers in `obs.hpp`.
+- Private scenes are removed from the private canvas before they're released.
+- **The private canvas outlives its scenes.** A scene made in a canvas keeps a pointer to the canvas's lock even after it's removed from the canvas, and libobs destroys released scenes later on its task thread. So `~SceneMirror` releases the scenes, waits for libobs's destroy queue (`obs_wait_for_destroy_queue`), and only then releases the canvas. Releasing the canvas first caused an intermittent crash in `obs_source_destroy_defer`. If a scene is somehow still alive after the wait, the canvas is deliberately leaked rather than freed under it.
+- The preview holds its canvas reference under a mutex while it draws, so the last release always happens on the UI thread.
+- Integration tests check that OBS reports `Number of memory leaks: 0` after a long session that ends with recordings still running.
 
 ## Portability
 
-The engine (`core/`, `video/`, `audio/` and `recording/`) uses only libobs APIs. Qt is confined to `ui/`, and Windows-specific code isn't allowed outside `utilities/`. This keeps future Linux and macOS ports to packaging work rather than engine changes.
+Engine code uses only libobs and the frontend API. Qt appears in the engine only to post work to the UI thread. The CI workflows (currently disabled) compile on Windows, macOS and Ubuntu; the Docker build covers Windows. Runtime testing has been done on Windows only.

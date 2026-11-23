@@ -7,8 +7,10 @@
 !/cmake
 !/data
 !/docs
+!/packaging
 !/src
 !/tests
+!/third-party
 !.clang-format
 !.editorconfig
 !.gersemirc
@@ -30,3 +32,9 @@
 
 # Exclude CMake build number cache
 /cmake/.CMakeBuildNumber
+
+# Exclude Python caches
+__pycache__/
+
+# Exclude downloaded test stream recordings
+test-stream*

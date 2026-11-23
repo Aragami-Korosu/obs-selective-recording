@@ -1,17 +1,17 @@
 # Specification
 
-**Status:** Draft v1.0 · **Platform:** Windows x64 first, with a portable architecture
+**Status:** v1.0 · **Platform:** Windows x64, tested on OBS 33.0.1 with Aitum Vertical 1.6.7. macOS and Linux builds compile but haven't been tested at runtime.
 
 ## 1. Product vision
 
-OBS Selective Recording is a native OBS Studio plugin that records a composition that differs from your livestream. You choose, per source and separately for video and audio, what goes into the recording. The livestream is left exactly as you built it in OBS.
+OBS Selective Recording is a native OBS Studio plugin that records a composition that differs from your livestream. You choose, per source or per placement, what goes into the recording; a source's sound goes with its video. The livestream is left as you built it in OBS, except that a source you set to Recording only is hidden from it.
 
 The plugin must:
 
 - Run entirely inside OBS Studio, with no external services.
 - Provide a dedicated, dockable management interface.
-- Route video and audio into the recording independently for every supported source.
-- **Never modify the live composition of any canvas.** It controls only its own recordings ([ADR-0003](adr/0003-stream-exclusion.md)).
+- Route every supported source into the recording, its video and audio together ([ADR-0010](adr/0010-audio-follows-video.md)).
+- **Change the live composition only when the user chooses Recording only**, by hiding that placement in OBS ([ADR-0003](adr/0003-stream-exclusion.md), amended by [ADR-0008](adr/0008-streamlabs-style-placements.md)). Otherwise it controls only its own recordings.
 - Stay in sync with the active scene collection.
 - Keep routing configuration across OBS restarts.
 - Work with dual-output setups (horizontal and vertical). Each canvas gets its own selective recording ([section 3.5](#35-multiple-canvases-dual-output)).
@@ -24,18 +24,18 @@ The plugin must:
 
 ## 2. Routing model
 
-Each source has a **video route** and an **audio route**. The plugin controls only the **Recording** column. The **Stream** column describes what the user intends, and the user sets that in OBS. The plugin uses it only to decide when to warn.
+Each source, or each placement of a source, has one **route**, covering its video and its audio. The recording takes a source's audio while the source is visible in the recording. Audio devices that aren't in any scene (Settings → Audio) have a route of their own.
 
-| Route | Config value | Recording (plugin) | Stream (user, in OBS) |
+| Route | Config value | Recording (plugin) | Stream |
 | --- | --- | :---: | --- |
 | Both | `both` | Included | Unchanged |
 | Stream only | `stream_only` | Excluded | Unchanged |
-| Recording only | `recording_only` | Included | User hides it. The plugin warns if it's still live. |
+| Recording only | `recording_only` | Included | The plugin hides the placement in OBS, and shows it again when the route changes back. An audio device has to be removed from the stream's track by the user; the plugin warns until it is. |
 | Off | `off` | Excluded | User hides it. The plugin warns if it's still live. |
 
 Rules:
 
-- Video and audio routes are independent. Changing one never changes the other.
+- One route covers video and audio ([ADR-0010](adr/0010-audio-follows-video.md)).
 - When more than one rule applies, the most specific wins:
   1. Scene-item override (one placement of a source)
   2. Canvas-specific source rule (the source on one canvas only)
@@ -43,7 +43,6 @@ Rules:
   4. Group or nested-scene inheritance
   5. Profile default
   6. Built-in default (`both`)
-- The interface and documentation must never say that the plugin removes a source from a stream.
 - **Disabling the plugin** returns every recording to the default all-included composition. It must never produce a blank or partial recording.
 
 ## 3. Functional requirements
@@ -112,7 +111,7 @@ The plugin needs to match OBS mixer behaviour, including volume, balance, sync o
 | Video encoder | NVENC, QuickSync, AMF or x264, discovered at runtime |
 | Audio encoder | AAC, plus Opus where the container allows it |
 | Resolution | Independent. Defaults to the canvas's base resolution. |
-| Frame rate | Follows OBS's global frame rate. libobs renders every canvas and view on one render loop. POC 1 will confirm whether a lower rate (for example 30 fps from a 60 fps canvas) is possible. |
+| Frame rate | OBS's frame rate, or a half, third or quarter of it (an encoder frame-rate divisor) |
 | Video quality and audio bitrate | Independent |
 | Output directory and filename format | Configurable |
 | Pause and resume | Required |
@@ -184,7 +183,7 @@ Routing must survive OBS restarts, scene and scene-collection changes, source re
 | A canvas is removed while recording | Stop that canvas's recording cleanly, and keep the file. |
 | A source is deleted while recording | Remove it from the mirror. The recording continues. |
 | OBS exits normally while recording | Stop and finalise every recording before the plugin unloads. |
-| OBS crashes or the power fails | The file stays playable (MKV, or a crash-resilient MP4 mode if POC 3 confirms one). On the next start, the plugin reports the interrupted recording and offers to remux it. |
+| OBS crashes or the power fails | The file stays playable (MKV, or OBS's hybrid MP4 output where available). On the next start, the dock lists the interrupted recording and links to it. OBS's **File → Remux Recordings** converts it to MP4. |
 
 The plugin records a session marker for each active recording. It removes the marker when the recording stops cleanly, and checks for leftover markers at startup.
 
@@ -205,7 +204,18 @@ The plugin records a session marker for each active recording. It removes the ma
 
 **Scope of NFR-002 and NFR-003.** The plugin runs inside the OBS process. A crash in plugin code takes OBS down with it, and the stream with it. These requirements cover failures the plugin can catch and handle. Crash risk is reduced by strict reference ownership, never letting C++ exceptions cross into libobs callbacks, defensive checks on every OBS handle, and the long-run tests in Phase 7.
 
-## 5. Out of scope for v1.0
+## 5. Known limitations in v1.0
+
+| Limitation | Effect |
+| --- | --- |
+| Audio transitions | Recording audio follows routes immediately. It doesn't crossfade during scene transitions or item show/hide fades. |
+| Show/hide transitions on items | Mirrored items appear and disappear instantly |
+| Studio Mode with Duplicate Scene | Per-placement routes don't apply to OBS's duplicated program scene. Source and canvas routes do. |
+| Nested scenes from another canvas | Use the size of the canvas being recorded |
+| OBS 33 log line | `Attempted to add Scene without specifying a canvas!` appears once for each mirrored scene when a recording or preview starts. It's harmless (see [ADR-0006](adr/0006-private-canvas-rendering.md)). |
+| Hardware encoder limits | Detected when a recording starts (with an optional fallback to x264), not predicted in advance |
+
+## 6. Out of scope for v1.0
 
 - Separate audio tracks (stems) for each source
 - File splitting and automatic remuxing during recording
