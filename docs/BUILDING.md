@@ -101,6 +101,8 @@ These scripts need a POSIX shell, so on Windows run them from Git Bash or WSL.
 
 `.github/scripts/Package-Windows.ps1` always makes the ZIP and makes the installer only when invoked with `-Package $true`. The CI workflow skips installer packaging on ordinary pull requests; release and main-branch builds request it. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). To build it by hand after `cmake --install`:
 
+To build installable artifacts on demand, open **Actions → Dispatch → Run workflow**, select `build`, and enable **Build installable packages**. The workflow uploads the Windows installer and ZIP, macOS package, and Debian packages as downloadable artifacts. Manually dispatched packages are unsigned; release signing runs only for version tags.
+
 ```powershell
 & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DProductVersion=1.0.0 `
   /DSourceDir=release\RelWithDebInfo\obs-selective-recording /DOutputDir=release `
