@@ -1,0 +1,38 @@
+name: Windows Docker Package
+run-name: Windows Docker package from ${{ github.ref_name }}
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    if: github.ref == 'refs/heads/main'
+    name: Build Windows packages in Docker
+    runs-on: [self-hosted, Windows, X64, obs-sr-docker-package]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Build and test Windows packages
+        run: |
+          $Output = Join-Path $env:RUNNER_TEMP 'obs-sr-docker-output'
+          $Cache = Join-Path $env:RUNNER_TOOL_CACHE 'obs-sr-docker-cache'
+          New-Item -ItemType Directory -Force $Output, $Cache | Out-Null
+          & .\build-aux\docker\build.ps1 -Output $Output -Cache $Cache
+          if ( $LASTEXITCODE -ne 0 ) {
+            throw "Docker packaging failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-selective-recording-windows-${{ github.run_number }}
+          path: ${{ runner.temp }}/obs-sr-docker-output/release/*
+          if-no-files-found: error
+          retention-days: 14

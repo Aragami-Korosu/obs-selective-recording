@@ -21,6 +21,8 @@ The container is removed when it finishes and uses only bind mounts, so no Docke
 
 After a build, run the [integration tests](#testing) against `release\RelWithDebInfo\obs-selective-recording`.
 
+The repository's **Windows Docker Package** action can run this same build on a dedicated, self-hosted Windows runner with Docker Desktop. It is manual-only, accepts runs from `main` only, and uploads the unsigned packages as a 14-day artifact. Never assign public pull-request jobs to this runner.
+
 ## Prerequisites (Windows)
 
 | Tool | Version | Notes |
