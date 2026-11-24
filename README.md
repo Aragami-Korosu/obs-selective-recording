@@ -130,6 +130,7 @@ More answers in [Troubleshooting](docs/TROUBLESHOOTING.md).
 | 🎛️ [Automation API](docs/API.md) | obs-websocket requests for Stream Deck and scripts |
 | 🏗️ [Architecture](docs/ARCHITECTURE.md) | How it works inside |
 | 🧱 [Building](docs/BUILDING.md) | Build and test from source |
+| 🔐 [Privacy policy](docs/PRIVACY.md) | What the plugin handles and stores |
 | 📜 [Changelog](CHANGELOG.md) | What's new |
 
 <details>
