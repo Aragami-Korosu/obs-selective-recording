@@ -131,7 +131,22 @@ function Package {
         Log-Group "Building installer for ${ProductName}..."
         $Iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
         if ( ! ( Test-Path $Iscc ) ) {
-            choco install innosetup --no-progress -y | Out-Host
+            Write-Host 'Installing Inno Setup (4-minute timeout)...'
+            $Chocolatey = (Get-Command choco -ErrorAction Stop).Source
+            $Install = Start-Process $Chocolatey -ArgumentList @(
+                'install', 'innosetup', '--no-progress', '-y', '--execution-timeout=180'
+            ) -PassThru -NoNewWindow
+            if ( ! $Install.WaitForExit(240000) ) {
+                Stop-Process -Id $Install.Id -Force -ErrorAction SilentlyContinue
+                throw 'Inno Setup installation timed out after 4 minutes'
+            }
+            $Install.Refresh()
+            if ( $Install.ExitCode -ne 0 ) {
+                throw "Inno Setup installation failed with exit code $($Install.ExitCode)"
+            }
+        }
+        if ( ! ( Test-Path $Iscc ) ) {
+            throw "Inno Setup compiler was not found at ${Iscc}"
         }
         $IsccArgs = @(
             '/Q'
@@ -147,9 +162,33 @@ function Package {
         if ( $SignCommand ) {
             $IsccArgs = @('/DSign', "/Ssigntool=${SignCommand} `$f") + $IsccArgs
         }
-        & $Iscc @IsccArgs
-        if ( $LASTEXITCODE -ne 0 ) {
-            throw "Installer build failed with exit code ${LASTEXITCODE}"
+        Write-Host 'Compiling Windows installer (5-minute timeout)...'
+        $CompilerInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $CompilerInfo.FileName = $Iscc
+        $CompilerInfo.WorkingDirectory = $ProjectRoot
+        $CompilerInfo.UseShellExecute = $false
+        $CompilerInfo.CreateNoWindow = $true
+        $CompilerInfo.RedirectStandardOutput = $true
+        $CompilerInfo.RedirectStandardError = $true
+        foreach ( $Argument in $IsccArgs ) {
+            [void] $CompilerInfo.ArgumentList.Add($Argument)
+        }
+        $Compiler = [System.Diagnostics.Process]::Start($CompilerInfo)
+        $CompilerOutput = $Compiler.StandardOutput.ReadToEndAsync()
+        $CompilerError = $Compiler.StandardError.ReadToEndAsync()
+        if ( ! $Compiler.WaitForExit(300000) ) {
+            Stop-Process -Id $Compiler.Id -Force -ErrorAction SilentlyContinue
+            throw 'Windows installer compilation timed out after 5 minutes'
+        }
+        $Compiler.WaitForExit()
+        if ( $CompilerOutput.Result ) {
+            Write-Host $CompilerOutput.Result
+        }
+        if ( $CompilerError.Result ) {
+            Write-Host $CompilerError.Result
+        }
+        if ( $Compiler.ExitCode -ne 0 ) {
+            throw "Installer build failed with exit code $($Compiler.ExitCode)"
         }
         Log-Group
 
