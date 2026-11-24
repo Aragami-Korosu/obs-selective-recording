@@ -99,7 +99,7 @@ These scripts need a POSIX shell, so on Windows run them from Git Bash or WSL.
 
 ## Packaging
 
-`.github/scripts/Package-Windows.ps1` always makes the ZIP and makes the installer only when invoked with `-Package $true`. The CI workflow skips installer packaging on ordinary pull requests; release and main-branch builds request it. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). To build it by hand after `cmake --install`:
+`.github/scripts/Package-Windows.ps1` always makes the ZIP and makes the installer only when invoked with `-Package $true`. The CI workflow skips installer packaging on ordinary pull requests; release and main-branch builds request it. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). If Inno Setup is not installed at its default location, the script downloads and verifies version 6.7.3; set `INNO_SETUP_COMPILER` to use an existing `ISCC.exe` instead. To build it by hand after `cmake --install`:
 
 To build installable artifacts on demand, open **Actions → Dispatch → Run workflow**, select `build`, and enable **Build installable packages**. The workflow uploads the Windows installer and ZIP, macOS package, and Debian packages as downloadable artifacts. Manually dispatched packages are unsigned; release signing runs only for version tags.
 
@@ -127,7 +127,7 @@ Vertical installs into the sibling folder `…\plugins\vertical-canvas` and is o
 
 The Docker build signs the plugin DLL, the installer and its uninstaller when you pass `-Signing` with a folder containing `signing.pfx` and `pfx-password.txt`. It uses osslsigncode with SHA-256 and a DigiCert timestamp. The folder is mounted read-only and the password is never printed. Without `-Signing`, builds are unsigned.
 
-If the GitHub workflows are re-enabled, CI signs the same files with `signtool` when the repository secrets `WINDOWS_SIGNING_PFX` (the `.pfx` file, base64-encoded) and `WINDOWS_SIGNING_PASSWORD` are set.
+GitHub Actions signs the same files with `signtool` on version-tag release builds when the repository secrets `WINDOWS_SIGNING_PFX` (the `.pfx` file, base64-encoded) and `WINDOWS_SIGNING_PASSWORD` are set.
 
 Test builds currently use a **self-signed** "Aragami Korosu" certificate. Windows shows that name as the publisher only on machines that trust it. To trust it, run this in an administrator PowerShell:
 
