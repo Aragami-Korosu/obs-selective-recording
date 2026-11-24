@@ -99,7 +99,7 @@ These scripts need a POSIX shell, so on Windows run them from Git Bash or WSL.
 
 ## Packaging
 
-`.github/scripts/Package-Windows.ps1` makes the ZIP and the installer. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). To build it by hand after `cmake --install`:
+`.github/scripts/Package-Windows.ps1` always makes the ZIP and makes the installer only when invoked with `-Package $true`. The CI workflow skips installer packaging on ordinary pull requests; release and main-branch builds request it. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). To build it by hand after `cmake --install`:
 
 ```powershell
 & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DProductVersion=1.0.0 `
@@ -135,6 +135,16 @@ packaging\windows\trust-test-certificate.ps1 -Remove   # undo
 ```
 
 Other people will still see "Unknown publisher" until the project uses a certificate from a public certificate authority.
+
+### Signed release artifacts
+
+Pushing a version tag such as `1.0.0` starts the release workflow. The workflow creates a draft only after all platform signing credentials are configured:
+
+- Windows: `WINDOWS_SIGNING_PFX` (base64-encoded PFX) and `WINDOWS_SIGNING_PASSWORD`.
+- macOS: `MACOS_SIGNING_CERT` (base64-encoded Developer ID PKCS#12), `MACOS_SIGNING_CERT_PASSWORD`, `MACOS_SIGNING_APPLICATION_IDENTITY`, `MACOS_SIGNING_INSTALLER_IDENTITY`, `MACOS_NOTARIZATION_USERNAME` and `MACOS_NOTARIZATION_PASSWORD`. The keychain password and provisioning profile are optional when applicable.
+- Debian: `DEBIAN_SIGNING_KEY` (base64-encoded ASCII-armored private key) and `DEBIAN_SIGNING_PASSPHRASE`. The release includes detached `.asc` signatures and the public key for verification.
+
+The self-signed Windows test certificate can produce a signature, but Windows does not trust it by default. Use a certificate from a public certificate authority for trusted Windows releases.
 
 ## Testing
 

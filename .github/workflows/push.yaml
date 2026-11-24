@@ -88,6 +88,76 @@ jobs:
             done
           done
 
+      - name: Validate release signing credentials
+        if: fromJSON(steps.check.outputs.validTag)
+        env:
+          WINDOWS_SIGNING_PFX: ${{ secrets.WINDOWS_SIGNING_PFX }}
+          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+          MACOS_SIGNING_CERT: ${{ secrets.MACOS_SIGNING_CERT }}
+          MACOS_SIGNING_CERT_PASSWORD: ${{ secrets.MACOS_SIGNING_CERT_PASSWORD }}
+          MACOS_SIGNING_APPLICATION_IDENTITY: ${{ secrets.MACOS_SIGNING_APPLICATION_IDENTITY }}
+          MACOS_SIGNING_INSTALLER_IDENTITY: ${{ secrets.MACOS_SIGNING_INSTALLER_IDENTITY }}
+          MACOS_NOTARIZATION_USERNAME: ${{ secrets.MACOS_NOTARIZATION_USERNAME }}
+          MACOS_NOTARIZATION_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
+          DEBIAN_SIGNING_KEY: ${{ secrets.DEBIAN_SIGNING_KEY }}
+          DEBIAN_SIGNING_PASSPHRASE: ${{ secrets.DEBIAN_SIGNING_PASSPHRASE }}
+        run: |
+          missing=()
+          for name in \
+            WINDOWS_SIGNING_PFX \
+            WINDOWS_SIGNING_PASSWORD \
+            MACOS_SIGNING_CERT \
+            MACOS_SIGNING_CERT_PASSWORD \
+            MACOS_SIGNING_APPLICATION_IDENTITY \
+            MACOS_SIGNING_INSTALLER_IDENTITY \
+            MACOS_NOTARIZATION_USERNAME \
+            MACOS_NOTARIZATION_PASSWORD \
+            DEBIAN_SIGNING_KEY \
+            DEBIAN_SIGNING_PASSPHRASE; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("${name}")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            printf '::error::Missing release signing secrets: %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+      - name: Sign Debian packages
+        if: fromJSON(steps.check.outputs.validTag)
+        env:
+          DEBIAN_SIGNING_KEY: ${{ secrets.DEBIAN_SIGNING_KEY }}
+          DEBIAN_SIGNING_PASSPHRASE: ${{ secrets.DEBIAN_SIGNING_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "${GNUPGHOME}"
+          trap 'rm -rf "${GNUPGHOME}"' EXIT
+
+          printf '%s' "${DEBIAN_SIGNING_KEY}" | base64 --decode | gpg --batch --import
+          key_id="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "sec" { print $5; exit }')"
+          if [[ -z "${key_id}" ]]; then
+            echo '::error::The Debian signing key contains no private signing key.'
+            exit 1
+          fi
+
+          gpg --armor --export "${key_id}" > debian-signing-key.asc
+          shopt -s nullglob
+          packages=( *.deb *.ddeb )
+          if (( ${#packages[@]} == 0 )); then
+            echo '::error::No Debian packages were produced to sign.'
+            exit 1
+          fi
+
+          for package in "${packages[@]}"; do
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "${DEBIAN_SIGNING_PASSPHRASE}" \
+              --local-user "${key_id}" \
+              --armor --detach-sign \
+              --output "${package}.asc" "${package}"
+          done
+
       - name: Generate Checksums 🪪
         if: fromJSON(steps.check.outputs.validTag)
         run: |
@@ -96,9 +166,11 @@ jobs:
           shopt -s extglob
 
           echo "### Checksums" > ${{ github.workspace }}/CHECKSUMS.txt
-          for file in ${{ github.workspace }}/@(*.exe|*.deb|*.ddeb|*.pkg|*.tar.xz|*.zip); do
+          for file in ${{ github.workspace }}/@(*.asc|*.exe|*.deb|*.ddeb|*.pkg|*.tar.xz|*.zip); do
             echo "    ${file##*/}: $(sha256sum "${file}" | cut -d " " -f 1)" >> ${{ github.workspace }}/CHECKSUMS.txt
           done
+          printf '\nDebian packages include detached OpenPGP signatures. Import debian-signing-key.asc, then verify with: gpg --verify <package>.asc <package>\n' \
+            >> ${{ github.workspace }}/CHECKSUMS.txt
 
       - name: Create Release 🛫
         if: fromJSON(steps.check.outputs.validTag)
@@ -116,4 +188,5 @@ jobs:
             ${{ github.workspace }}/*.pkg
             ${{ github.workspace }}/*.deb
             ${{ github.workspace }}/*.ddeb
+            ${{ github.workspace }}/*.asc
             ${{ github.workspace }}/*.tar.xz

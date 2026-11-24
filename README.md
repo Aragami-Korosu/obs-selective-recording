@@ -139,6 +139,10 @@ More answers in [Troubleshooting](docs/TROUBLESHOOTING.md).
 
 </details>
 
+## Support
+
+If you find this plugin useful, you can leave a tip on [Ko-fi](https://ko-fi.com/aragmikorosu).
+
 ## License
 
 [GPL-2.0-or-later](LICENSE), the same license as OBS Studio.
