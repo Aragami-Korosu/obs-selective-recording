@@ -19,6 +19,23 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - name: Wait for Docker Desktop
+        run: |
+          $Deadline = (Get-Date).AddMinutes(5)
+          do {
+            $DockerOS = docker info --format '{{.OSType}}' 2>$null
+            if ( $LASTEXITCODE -eq 0 ) {
+              break
+            }
+            Start-Sleep -Seconds 5
+          } while ( (Get-Date) -lt $Deadline )
+          if ( $LASTEXITCODE -ne 0 ) {
+            throw 'Docker Desktop did not become ready within 5 minutes'
+          }
+          if ( $DockerOS.Trim() -ne 'linux' ) {
+            throw "Expected Docker Linux containers but got '$DockerOS'"
+          }
+
       - name: Build and test Windows packages
         run: |
           $Output = Join-Path $env:RUNNER_TEMP 'obs-sr-docker-output'
