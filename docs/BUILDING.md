@@ -21,6 +21,16 @@ The container is removed when it finishes and uses only bind mounts, so no Docke
 
 After a build, run the [integration tests](#testing) against `release\RelWithDebInfo\obs-selective-recording`.
 
+The repository's **Windows Docker Package** action can run this same build on a dedicated, self-hosted Windows runner with Docker Desktop. It is manual-only, accepts runs from `main` only, and uploads the unsigned packages as a 14-day artifact. Never assign public pull-request jobs to this runner.
+
+To build Ubuntu packages locally on Windows, run:
+
+```powershell
+build-aux\docker\build-ubuntu.ps1
+```
+
+This uses an Ubuntu 24.04 container, caches downloaded dependencies in `.deps\docker-ubuntu`, and writes the Debian packages, source archive, and checksums to `release\ubuntu\`. The manual **Windows Docker Package** action also builds and uploads Ubuntu packages.
+
 ## Prerequisites (Windows)
 
 | Tool | Version | Notes |
