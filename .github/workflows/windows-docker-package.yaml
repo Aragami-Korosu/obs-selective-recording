@@ -7,7 +7,7 @@ permissions:
 jobs:
   package:
     if: github.ref == 'refs/heads/main'
-    name: Build Windows packages in Docker
+    name: Build Windows and Ubuntu packages in Docker
     runs-on: [self-hosted, Windows, X64, obs-sr-docker-package]
     timeout-minutes: 90
     defaults:
@@ -51,5 +51,23 @@ jobs:
         with:
           name: obs-selective-recording-windows-${{ github.run_number }}
           path: ${{ runner.temp }}/obs-sr-docker-output/release/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Build Ubuntu packages
+        run: |
+          $Output = Join-Path $env:RUNNER_TEMP 'obs-sr-ubuntu-output'
+          $Cache = Join-Path $env:RUNNER_TOOL_CACHE 'obs-sr-ubuntu-cache'
+          New-Item -ItemType Directory -Force $Output, $Cache | Out-Null
+          & .\build-aux\docker\build-ubuntu.ps1 -Output $Output -Cache $Cache
+          if ( $LASTEXITCODE -ne 0 ) {
+            throw "Ubuntu packaging failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Upload Ubuntu packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-selective-recording-ubuntu-${{ github.run_number }}
+          path: ${{ runner.temp }}/obs-sr-ubuntu-output/*
           if-no-files-found: error
           retention-days: 14
