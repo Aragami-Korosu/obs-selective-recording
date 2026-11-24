@@ -99,7 +99,7 @@ These scripts need a POSIX shell, so on Windows run them from Git Bash or WSL.
 
 ## Packaging
 
-`.github/scripts/Package-Windows.ps1` makes the ZIP and the installer. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). To build it by hand after `cmake --install`:
+`.github/scripts/Package-Windows.ps1` always makes the ZIP and makes the installer only when invoked with `-Package $true`. The CI workflow skips installer packaging on ordinary pull requests; release and main-branch builds request it. The installer is built with [Inno Setup 6](https://jrsoftware.org/isinfo.php) from [packaging/windows/installer.iss](../packaging/windows/installer.iss). To build it by hand after `cmake --install`:
 
 ```powershell
 & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DProductVersion=1.0.0 `

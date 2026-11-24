@@ -252,6 +252,7 @@ jobs:
   windows-build:
     name: Build for Windows 🪟
     runs-on: windows-2022
+    timeout-minutes: 20
     needs: check-event
     defaults:
       run:
